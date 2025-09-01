@@ -40,6 +40,41 @@ jobs:
           additional_permissions: |
             actions: read
 
+          # MCP server configuration for Playwright browser automation
+          mcp_config: |
+            {
+              "mcpServers": {
+                "playwright": {
+                  "command": "npx",
+                  "args": ["@playwright/mcp@latest"]
+                }
+              }
+            }
+
+          # Allow all Playwright MCP tools
+          allowed_tools: |
+            mcp__playwright__browser_close
+            mcp__playwright__browser_resize
+            mcp__playwright__browser_console_messages
+            mcp__playwright__browser_handle_dialog
+            mcp__playwright__browser_evaluate
+            mcp__playwright__browser_file_upload
+            mcp__playwright__browser_fill_form
+            mcp__playwright__browser_install
+            mcp__playwright__browser_press_key
+            mcp__playwright__browser_type
+            mcp__playwright__browser_navigate
+            mcp__playwright__browser_navigate_back
+            mcp__playwright__browser_network_requests
+            mcp__playwright__browser_take_screenshot
+            mcp__playwright__browser_snapshot
+            mcp__playwright__browser_click
+            mcp__playwright__browser_drag
+            mcp__playwright__browser_hover
+            mcp__playwright__browser_select_option
+            mcp__playwright__browser_tabs
+            mcp__playwright__browser_wait_for
+
           # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
           # prompt: 'Update the pull request description to include a summary of changes.'
 
