@@ -55,43 +55,144 @@ jobs:
       - name: Ensure Playwright MCP directory exists
         run: mkdir -p .playwright-mcp
 
-      - name: Run Claude Code
-        id: claude
+      # Step 1: Understand request and create plan
+      - name: Step 1 - Analyze Request and Plan
+        id: analyze-and-plan
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-
-          # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
             actions: read
-
-          # Custom prompt for Node-RED development workflow
+            issues: read
+            pull-requests: read
           prompt: |
             You are an expert Node-RED developer with strong UI/UX design knowledge.
+
+            ## Step 1: Understand and Plan
+
+            Your task is to understand what the user is asking for and create a detailed plan:
+
+            1. Read the GitHub issue/comment that triggered this workflow to understand the exact request
+            2. Explore the Node-RED codebase to understand the current implementation
+            3. Create a specific plan that identifies:
+               - Which specific UI areas/components will be affected
+               - What files need to be modified
+               - What the expected visual changes will be and create a numbered list detailing each change
+            4. Output a detailed plan that will guide the next steps
 
             ## Environment
             Node-RED is already built and running on http://localhost:1880 in this GitHub Actions environment.
 
-            ## Development Workflow
-            1. Use Playwright (if possible in subagents) to inspect the running Node-RED instance
-            2. Make ONLY the requested changes - do not extend beyond the user's scope
-            3. Apply UI/UX best practices ONLY to the specific changes being made while adhering to the existing interface.
-            4. Test the specific changes with Playwright and Playwright screenshots
-            5. Iterate until requirements are met
+            IMPORTANT: Focus only on understanding the request and creating a plan. Do not make any changes yet.
+          claude_args: |
+            --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
+            --allowed-tools mcp__github__get_issue,mcp__github__get_notification_details,mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_wait_for
+
+      # Step 2: Take targeted screenshots based on plan
+      - name: Step 2 - Take Targeted Before Screenshots
+        id: before-screenshots
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            ## Step 2: Take Targeted Screenshots
+
+            Based on the plan created in Step 1, take specific screenshots of the Node-RED interface areas that will be modified:
+
+            1. Navigate to http://localhost:1880 using Playwright
+            2. Wait for the interface to fully load
+            3. Navigate the UI if necessary and take a screenshot that includes the change for each of the visual changes in the plan
+            4. Save screenshots with names that include the number of the visual change list step, like 'before-[change-number].png'
+
+            The goal is to capture the current state of the specific areas that will be modified, not generic full-page screenshots.
+          claude_args: |
+            --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
+            --allowed-tools mcp__playwright__browser_navigate,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate
+
+      # Step 3: Implement, test, and iterate
+      - name: Step 3 - Implement and Test Changes
+        id: implement-changes
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          additional_permissions: |
+            actions: read
+          prompt: |
+            ## Step 3: Implement and Test
+
+            Execute the plan created in Step 1:
+
+            1. Implement the specific changes identified in the plan
+            2. For frontend changes: run `npm run build` to rebuild assets
+            3. For backend/core changes: restart Node-RED if needed
+            4. Test the changes using Playwright to ensure they work correctly
+            5. Take intermediate screenshots during testing if needed
+            6. Iterate and refine until the requirements are fully met
 
             ## Making Changes
-            - For frontend changes: run `npm run build` to rebuild assets
-            - For backend/core changes: you may need to restart Node-RED entirely
-            - ALWAYS take screenshots with Playwright (saved to `.playwright-mcp/` directory automatically)
-            - Include final before/after screenshots in your GitHub issue response showing the changes
-            - IMPORTANT: Do not extend scope beyond what was requested
+            - Apply UI/UX best practices ONLY to the specific changes being made
+            - Maintain consistency with existing interface patterns
+            - STAY FOCUSED: Do not extend beyond the user's specific request
+            - Test thoroughly before considering the implementation complete
 
-            ## UI/UX Principles (Apply only to requested changes)
-            When making the specific changes requested, consider: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing, performance impact, and adhering to existing design patterns.
-
-            CRITICAL: Stay focused on the user's specific request. Do not redesign or improve other areas of Node-RED unless it is part of the scope that the user asked to change.
-
-          # Configure MCP servers and allowed tools via claude_args
+            CRITICAL: Only implement what was requested - no additional improvements or redesigns.
           claude_args: |
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowed-tools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for
+
+      # Step 4: Take after screenshots of the same areas
+      - name: Step 4 - Take Targeted After Screenshots
+        id: after-screenshots
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            ## Step 4: Take After Screenshots
+
+            Take screenshots of the EXACT SAME areas that were captured in Step 2, but now showing the implemented changes:
+
+            1. Navigate to http://localhost:1880 using Playwright
+            2. Wait for the interface to fully load and changes to be visible  
+            3. Take screenshots of the same specific areas captured in Step 2
+            4. Save screenshots with corresponding names like 'after-[area-number].png'
+
+            The goal is to show the before/after state of the exact same interface areas.
+          claude_args: |
+            --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
+            --allowed-tools mcp__playwright__browser_navigate,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate
+
+      # Step 5: Post targeted before/after comparison
+      - name: Step 5 - Post Screenshots Comparison
+        id: post-comparison
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          additional_permissions: |
+            actions: read
+            issues: write
+            pull-requests: write
+          prompt: |
+            ## Step 5: Post Targeted Comparison
+
+            Create and post a before/after comparison to the GitHub issue showing the specific Node-RED interface changes:
+
+            1. Locate all the before screenshots (before-[area-name].png) and corresponding after screenshots (after-[area-name].png)
+            2. Create a markdown comparison showing each changed area side by side
+            3. Add a summary of what specific changes were implemented
+            4. Post this comparison as a comment on the GitHub issue that triggered this workflow
+
+            Use this format for each area that was changed:
+
+            ## 🎨 Node-RED Interface Changes
+
+            ### [Area/Component Name]
+            | Before | After |
+            |--------|-------|
+            | ![Before](path/to/before-[area].png) | ![After](path/to/after-[area].png) |
+
+            ### Summary of Changes:
+            - [Specific changes implemented for this area]
+
+            Repeat for each area that was modified. The comparisons should show the exact UI components that were changed, making it easy to see the specific improvements made.
+          claude_args: |
+            --allowed-tools mcp__github__add_issue_comment,mcp__github__get_issue
