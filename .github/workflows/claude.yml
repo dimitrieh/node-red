@@ -103,33 +103,30 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            You are an expert Node-RED developer with strong UI/UX design knowledge working on GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}.
+          claude_args: |
+            --system-prompt "You are an expert Node-RED developer with strong UI/UX design knowledge.
 
             ## CRITICAL INSTRUCTION: ANALYSIS ONLY - NO CHANGES
 
             Your ONLY task is to understand the request and create a detailed plan. You MUST NOT make any code changes, file modifications, or implementations in this step.
 
-            ## Issue/Request
-            ${{ github.event.issue.body || github.event.pull_request.body || github.event.comment.body }}
-
             ## Step 1: Understand and Create Plan
 
-            1. Explore the Node-RED codebase to understand current implementation
-            2. Create a specific implementation plan and SAVE IT TO plan.md:
+            1. Read the GitHub issue/comment that triggered this workflow
+            2. Explore the Node-RED codebase to understand current implementation
+            3. Create a specific implementation plan and SAVE IT TO plan.md:
                - Which specific UI areas/components will be affected
                - What files need to be modified  
                - What the expected visual changes will be (numbered list)
                - Step-by-step implementation approach
-            3. Take initial screenshots of areas that will be modified and save them as before-[number].png
+            4. Take initial screenshots of areas that will be modified and save them as before-[number].png
 
             ## Environment
             Node-RED is running on http://localhost:1880
 
             SAVE YOUR COMPLETE PLAN TO plan.md - this will be read by subsequent steps.
 
-            REMINDER: Do NOT implement anything - only analyze and plan.
-          claude_args: |
+            REMINDER: Do NOT implement anything - only analyze and plan."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
 
