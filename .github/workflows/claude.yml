@@ -35,7 +35,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          
+
           # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
             actions: read
@@ -75,11 +75,20 @@ jobs:
             mcp__playwright__browser_tabs
             mcp__playwright__browser_wait_for
 
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
+          # Custom prompt for Node-RED development workflow
+          prompt: |
+            Most of the time the user will ask you to help with Node-RED development/experimentation.
+
+            To run and test Node-RED:
+            1. Install dependencies: npm install
+            2. Build the code: npm run build  
+            3. Run: npm start
+
+            Use playwright to inspect the running Node-RED instance, including visual inspection. Every time you use playwright, do that in a subagent.
+
+            When reporting back to the user include screenshots of Node-RED made with Playwright.
 
           # Optional: Add claude_args to customize behavior and configuration
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://docs.anthropic.com/en/docs/claude-code/sdk#command-line for available options
           # claude_args: '--model claude-opus-4-1-20250805 --allowed-tools Bash(gh pr:*)'
-
