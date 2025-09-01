@@ -51,6 +51,23 @@ jobs:
             test/
           sparse-checkout-cone-mode: false
 
+      - name: Setup consistent branch
+        run: |
+          BRANCH="claude/issue-${{ github.event.issue.number || github.event.pull_request.number }}"
+          echo "CLAUDE_BRANCH=$BRANCH" >> $GITHUB_ENV
+          echo "Working on branch: $BRANCH"
+          
+          # Check if branch exists remotely
+          if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+            echo "Branch $BRANCH exists, checking out..."
+            git fetch origin "$BRANCH"
+            git checkout "$BRANCH"
+          else
+            echo "Creating new branch $BRANCH"
+            git checkout -b "$BRANCH"
+            git push -u origin "$BRANCH"
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -86,32 +103,42 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: |
-            --system-prompt "You are an expert Node-RED developer with strong UI/UX design knowledge.
+          prompt: |
+            You are an expert Node-RED developer with strong UI/UX design knowledge working on GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}.
 
             ## CRITICAL INSTRUCTION: ANALYSIS ONLY - NO CHANGES
 
             Your ONLY task is to understand the request and create a detailed plan. You MUST NOT make any code changes, file modifications, or implementations in this step.
 
+            ## Issue/Request
+            ${{ github.event.issue.body || github.event.pull_request.body || github.event.comment.body }}
+
             ## Step 1: Understand and Create Plan
 
-            1. Read the GitHub issue/comment that triggered this workflow
-            2. Explore the Node-RED codebase to understand current implementation
-            3. Create a specific implementation plan and SAVE IT TO plan.md:
+            1. Explore the Node-RED codebase to understand current implementation
+            2. Create a specific implementation plan and SAVE IT TO plan.md:
                - Which specific UI areas/components will be affected
                - What files need to be modified  
                - What the expected visual changes will be (numbered list)
                - Step-by-step implementation approach
-            4. Take initial screenshots of areas that will be modified and save them as before-[number].png
+            3. Take initial screenshots of areas that will be modified and save them as before-[number].png
 
             ## Environment
             Node-RED is running on http://localhost:1880
 
             SAVE YOUR COMPLETE PLAN TO plan.md - this will be read by subsequent steps.
 
-            REMINDER: Do NOT implement anything - only analyze and plan."
+            REMINDER: Do NOT implement anything - only analyze and plan.
+          claude_args: |
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
-            --allowedTools mcp__github__get_issue,mcp__github__get_notification_details,mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
+            --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
+
+      - name: Clean Git State After Step 1
+        run: |
+          git add -A
+          git stash --include-untracked || true
+          git clean -fd
+        continue-on-error: true
 
       # Step 2: Implementation based on saved plan
       - name: Step 2 - Implement and Test Changes
@@ -119,10 +146,12 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: |
-            --system-prompt "## Step 2: Implement Changes
+          prompt: |
+            ## Step 2: Implement Changes for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
 
-            1. READ the detailed plan from plan.md - this contains the complete implementation strategy
+            You are working on the implementation phase. Follow these steps:
+
+            1. READ the detailed plan from plan.md - this contains the complete implementation strategy created in Step 1
             2. Follow the plan exactly as specified
             3. For frontend changes: run npm run build to rebuild assets
             4. For backend/core changes: restart Node-RED if needed using:
@@ -135,9 +164,22 @@ jobs:
             - STAY FOCUSED: Only implement what's in the plan
             - Test thoroughly before considering complete
 
-            The plan file contains all the details you need - refer to it throughout implementation."
+            ## Environment
+            - Node-RED is running on http://localhost:1880
+            - You are working on branch: ${{ env.CLAUDE_BRANCH }}
+            - The plan file contains all the details you need - refer to it throughout implementation
+
+            Begin implementation now.
+          claude_args: |
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Read,Write,Edit,MultiEdit,Bash
+
+      - name: Clean Git State After Step 2
+        run: |
+          git add -A
+          git stash --include-untracked || true
+          git clean -fd
+        continue-on-error: true
 
       # Step 3: Validation and documentation
       - name: Step 3 - Validate and Document Results
@@ -145,19 +187,22 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: |
-            --system-prompt "## Step 3: Validate and Document
+          prompt: |
+            ## Step 3: Validate and Document for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
+
+            You are in the final validation and documentation phase. Complete these steps:
 
             1. READ the plan from plan.md to understand what was supposed to be implemented
             2. Navigate to http://localhost:1880 and verify all changes work correctly, and if not do fixes as needed
-            3. Take final screenshots as after-[number].png matching any before screenshots
-            4. Create a comprehensive before/after comparison comment on the GitHub issue:
-               - Show each changed area side by side
-               - Summarize what was implemented
-               - Note any deviations from the original plan
-               - Include the complete plan for reference
+            3. Take final screenshots as after-[number].png matching any before screenshots from Step 1
+            4. Create a comprehensive before/after comparison comment on the GitHub issue
 
-            Use this markdown format:
+            ## Environment
+            - Node-RED is running on http://localhost:1880
+            - You are working on branch: ${{ env.CLAUDE_BRANCH }}
+            - Implementation should be complete from Step 2
+
+            Use this markdown format for your GitHub comment:
 
             ## 🎨 Node-RED Interface Implementation Complete
 
@@ -174,6 +219,9 @@ jobs:
             - ✅ [Change 1 completed]
             - ✅ [Change 2 completed]
 
-            All requested changes have been implemented and tested successfully."
+            All requested changes have been implemented and tested successfully.
+
+            Begin validation and documentation now.
+          claude_args: |
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
             --allowedTools mcp__github__add_issue_comment,mcp__github__get_issue,mcp__playwright__browser_navigate,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Read
