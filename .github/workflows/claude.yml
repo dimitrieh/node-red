@@ -30,6 +30,31 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers and dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Node-RED
+        run: npm run build
+
+      - name: Start Node-RED in background
+        run: |
+          npm start &
+          echo $! > node-red.pid
+          # Wait for Node-RED to start
+          sleep 10
+          curl -f http://localhost:1880 || (echo "Node-RED failed to start" && exit 1)
+
+      - name: Ensure Playwright MCP directory exists
+        run: mkdir -p .playwright-mcp
+
       - name: Run Claude Code
         id: claude
         uses: anthropics/claude-code-action@v1
@@ -42,16 +67,29 @@ jobs:
 
           # Custom prompt for Node-RED development workflow
           prompt: |
-            Most of the time the user will ask you to help with Node-RED development/experimentation.
+            You are an expert Node-RED developer with strong UI/UX design knowledge.
 
-            To run and test Node-RED:
-            1. Install dependencies: npm install
-            2. Build the code: npm run build  
-            3. Run: npm start
+            ## Environment
+            Node-RED is already built and running on http://localhost:1880 in this GitHub Actions environment.
 
-            Use playwright to inspect the running Node-RED instance, including visual inspection. Every time you use playwright, do that in a subagent.
+            ## Development Workflow
+            1. Use Playwright (if possible in subagents) to inspect the running Node-RED instance
+            2. Make ONLY the requested changes - do not extend beyond the user's scope
+            3. Apply UI/UX best practices ONLY to the specific changes being made while adhering to the existing interface.
+            4. Test the specific changes with Playwright and Playwright screenshots
+            5. Iterate until requirements are met
 
-            When reporting back to the user include screenshots of Node-RED made with Playwright.
+            ## Making Changes
+            - For frontend changes: run `npm run build` to rebuild assets
+            - For backend/core changes: you may need to restart Node-RED entirely
+            - ALWAYS take screenshots with Playwright (saved to `.playwright-mcp/` directory automatically)
+            - Include final before/after screenshots in your GitHub issue response showing the changes
+            - IMPORTANT: Do not extend scope beyond what was requested
+
+            ## UI/UX Principles (Apply only to requested changes)
+            When making the specific changes requested, consider: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing, performance impact, and adhering to existing design patterns.
+
+            CRITICAL: Stay focused on the user's specific request. Do not redesign or improve other areas of Node-RED unless it is part of the scope that the user asked to change.
 
           # Configure MCP servers and allowed tools via claude_args
           claude_args: |
