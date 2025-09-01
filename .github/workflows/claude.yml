@@ -51,23 +51,6 @@ jobs:
             test/
           sparse-checkout-cone-mode: false
 
-      - name: Setup consistent branch
-        run: |
-          BRANCH="claude/issue-${{ github.event.issue.number || github.event.pull_request.number }}"
-          echo "CLAUDE_BRANCH=$BRANCH" >> $GITHUB_ENV
-          echo "Working on branch: $BRANCH"
-          
-          # Check if branch exists remotely
-          if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
-            echo "Branch $BRANCH exists, checking out..."
-            git fetch origin "$BRANCH"
-            git checkout "$BRANCH"
-          else
-            echo "Creating new branch $BRANCH"
-            git checkout -b "$BRANCH"
-            git push -u origin "$BRANCH"
-          fi
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -130,6 +113,14 @@ jobs:
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
 
+      - name: Detect Branch Created by Step 1
+        id: detect-branch
+        run: |
+          BRANCH=$(git branch --show-current)
+          echo "Step 1 created/used branch: $BRANCH"
+          echo "branch_name=$BRANCH" >> $GITHUB_OUTPUT
+          echo "CLAUDE_BRANCH=$BRANCH" >> $GITHUB_ENV
+
       - name: Clean Git State After Step 1
         run: |
           git add -A
@@ -145,6 +136,8 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             ## Step 2: Implement Changes for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
+
+            You are continuing the work from Step 1 on branch: ${{ env.CLAUDE_BRANCH }}
 
             You are working on the implementation phase. Follow these steps:
 
@@ -186,6 +179,8 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             ## Step 3: Validate and Document for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
+
+            You are completing the final phase on branch: ${{ env.CLAUDE_BRANCH }}
 
             You are in the final validation and documentation phase. Complete these steps:
 
