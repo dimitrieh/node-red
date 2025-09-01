@@ -28,15 +28,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "18"
+          cache: "npm"
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Install Playwright browsers and dependencies
         run: npx playwright install --with-deps chromium
@@ -65,33 +66,32 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            You are an expert Node-RED developer with strong UI/UX design knowledge.
+          claude_args: |
+            --system-prompt "You are an expert Node-RED developer with strong UI/UX design knowledge.
 
             ## CRITICAL INSTRUCTION: ANALYSIS ONLY - NO CHANGES
-            
+
             Your ONLY task is to understand the request and create a detailed plan. You MUST NOT make any code changes, file modifications, or implementations in this step.
 
             ## Step 1: Understand and Create Plan
 
             1. Read the GitHub issue/comment that triggered this workflow
             2. Explore the Node-RED codebase to understand current implementation
-            3. Create a specific implementation plan and SAVE IT TO `plan.md`:
+            3. Create a specific implementation plan and SAVE IT TO plan.md:
                - Which specific UI areas/components will be affected
                - What files need to be modified  
                - What the expected visual changes will be (numbered list)
                - Step-by-step implementation approach
-            4. Take initial screenshots of areas that will be modified and save them as `before-[number].png`
+            4. Take initial screenshots of areas that will be modified and save them as before-[number].png
 
             ## Environment
             Node-RED is running on http://localhost:1880
 
-            SAVE YOUR COMPLETE PLAN TO `plan.md` - this will be read by subsequent steps.
-            
-            REMINDER: Do NOT implement anything - only analyze and plan.
-          claude_args: |
+            SAVE YOUR COMPLETE PLAN TO plan.md - this will be read by subsequent steps.
+
+            REMINDER: Do NOT implement anything - only analyze and plan."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
-            --allowed-tools mcp__github__get_issue,mcp__github__get_notification_details,mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
+            --allowedTools mcp__github__get_issue,mcp__github__get_notification_details,mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
 
       # Step 2: Implementation based on saved plan
       - name: Step 2 - Implement and Test Changes
@@ -99,19 +99,14 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            ## Step 2: Implement Changes
+          claude_args: |
+            --system-prompt "## Step 2: Implement Changes
 
-            1. READ the detailed plan from `plan.md` - this contains the complete implementation strategy
+            1. READ the detailed plan from plan.md - this contains the complete implementation strategy
             2. Follow the plan exactly as specified
-            3. For frontend changes: run `npm run build` to rebuild assets
+            3. For frontend changes: run npm run build to rebuild assets
             4. For backend/core changes: restart Node-RED if needed using:
-               ```bash
-               kill $(cat node-red.pid)
-               npm start &
-               echo $! > node-red.pid
-               sleep 10
-               ```
+               kill $(cat node-red.pid) && npm start & && echo $! > node-red.pid && sleep 10
             5. Test changes using Playwright to ensure they work correctly
 
             ## Implementation Guidelines
@@ -120,10 +115,9 @@ jobs:
             - STAY FOCUSED: Only implement what's in the plan
             - Test thoroughly before considering complete
 
-            The plan file contains all the details you need - refer to it throughout implementation.
-          claude_args: |
+            The plan file contains all the details you need - refer to it throughout implementation."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
-            --allowed-tools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Read,Write,Edit,MultiEdit,Bash
+            --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Read,Write,Edit,MultiEdit,Bash
 
       # Step 3: Validation and documentation
       - name: Step 3 - Validate and Document Results
@@ -131,12 +125,12 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            ## Step 3: Validate and Document
+          claude_args: |
+            --system-prompt "## Step 3: Validate and Document
 
-            1. READ the plan from `plan.md` to understand what was supposed to be implemented
-            2. Navigate to http://localhost:1880 and verify all changes work correctly
-            3. Take final screenshots as `after-[number].png` matching any before screenshots
+            1. READ the plan from plan.md to understand what was supposed to be implemented
+            2. Navigate to http://localhost:1880 and verify all changes work correctly, and if not do fixes as needed
+            3. Take final screenshots as after-[number].png matching any before screenshots
             4. Create a comprehensive before/after comparison comment on the GitHub issue:
                - Show each changed area side by side
                - Summarize what was implemented
@@ -159,16 +153,7 @@ jobs:
             ### Summary
             - ✅ [Change 1 completed]
             - ✅ [Change 2 completed]
-            
-            All requested changes have been implemented and tested successfully.
-          claude_args: |
-            --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
-            --allowed-tools mcp__github__add_issue_comment,mcp__github__get_issue,mcp__playwright__browser_navigate,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Read
 
-      # Cleanup
-      - name: Cleanup
-        if: always()
-        run: |
-          if [ -f node-red.pid ]; then
-            kill $(cat node-red.pid) || true
-          fi
+            All requested changes have been implemented and tested successfully."
+            --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
+            --allowedTools mcp__github__add_issue_comment,mcp__github__get_issue,mcp__playwright__browser_navigate,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Read
