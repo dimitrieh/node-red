@@ -29,6 +29,27 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          sparse-checkout: |
+            .gitattributes
+            .github/
+            .gitignore
+            .jshintrc
+            API.md
+            CHANGELOG.md
+            CITATION.cff
+            CODE_OF_CONDUCT.md
+            CONTRIBUTING.md
+            Gruntfile.js
+            jsdoc.json
+            LICENSE
+            nodemon.json
+            package.json
+            packages/
+            README.md
+            scripts/
+            SECURITY.md
+            test/
+          sparse-checkout-cone-mode: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
