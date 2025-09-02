@@ -477,22 +477,47 @@ jobs:
                 // Build image base URL
                 const imageBaseUrl = `https://${repoOwner}.github.io/${repoName}/${issueNumber}/${commitHash}`;
                 
-                // Check for before/after screenshot pairs
+                // Check for before/after screenshot pairs with resolution suffixes
                 const screenshotDir = path.dirname(metadataPath);
-                let commentBody = '## 📸 Visual Comparison\n\n| Before | After |\n|--------|-------|\n';
+                let commentBody = '## 📸 Visual Comparison\n\n';
                 let screenshotsFound = false;
                 
+                // Define resolution mapping and display names
+                const resolutions = [
+                  { suffix: 'desktop', name: 'Desktop (1920x1080)' },
+                  { suffix: 'laptop', name: 'Laptop (1440x900)' },
+                  { suffix: 'tablet', name: 'Tablet (768x1024)' },
+                  { suffix: 'mobile', name: 'Mobile (375x667)' }
+                ];
+                
+                // Look for screenshot pairs across different numbering and resolution patterns
                 for (let i = 1; i <= 5; i++) {
-                  const beforeFile = path.join(screenshotDir, `before-${i}.png`);
-                  const afterFile = path.join(screenshotDir, `after-${i}.png`);
+                  let sectionFound = false;
+                  let sectionBody = '';
                   
-                  try {
-                    await stat(beforeFile);
-                    await stat(afterFile);
-                    commentBody += `| ![Before ${i}](${imageBaseUrl}/before-${i}.png) | ![After ${i}](${imageBaseUrl}/after-${i}.png) |\n`;
-                    screenshotsFound = true;
-                  } catch (err) {
-                    // Screenshot pair doesn't exist, skip
+                  // Check each resolution for this screenshot number
+                  for (const resolution of resolutions) {
+                    const beforeFile = path.join(screenshotDir, `before-${i}-${resolution.suffix}.png`);
+                    const afterFile = path.join(screenshotDir, `after-${i}-${resolution.suffix}.png`);
+                    
+                    try {
+                      await stat(beforeFile);
+                      await stat(afterFile);
+                      
+                      if (!sectionFound) {
+                        sectionBody += `### Screenshot ${i}\n\n| Resolution | Before | After |\n|------------|--------|-------|\n`;
+                        sectionFound = true;
+                      }
+                      
+                      sectionBody += `| ${resolution.name} | ![Before ${i} ${resolution.suffix}](${imageBaseUrl}/before-${i}-${resolution.suffix}.png) | ![After ${i} ${resolution.suffix}](${imageBaseUrl}/after-${i}-${resolution.suffix}.png) |\n`;
+                      screenshotsFound = true;
+                    } catch (err) {
+                      // Screenshot pair doesn't exist for this resolution, skip
+                    }
+                  }
+                  
+                  if (sectionFound) {
+                    commentBody += sectionBody + '\n';
                   }
                 }
                 
