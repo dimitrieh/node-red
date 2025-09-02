@@ -164,6 +164,8 @@ module.exports = function(grunt) {
                     "packages/node_modules/@node-red/editor-client/src/js/ui/common/typedInput.js",
                     "packages/node_modules/@node-red/editor-client/src/js/ui/common/toggleButton.js",
                     "packages/node_modules/@node-red/editor-client/src/js/ui/common/autoComplete.js",
+                    "packages/node_modules/@node-red/editor-client/src/js/ui/floatingWindow.js",
+                    "packages/node_modules/@node-red/editor-client/src/js/ui/windowManager.js",
                     "packages/node_modules/@node-red/editor-client/src/js/ui/actions.js",
                     "packages/node_modules/@node-red/editor-client/src/js/ui/deploy.js",
                     "packages/node_modules/@node-red/editor-client/src/js/ui/diagnostics.js",
