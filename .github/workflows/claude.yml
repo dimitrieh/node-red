@@ -88,13 +88,9 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
             --system-prompt "You are an expert Node-RED developer with strong UI/UX design knowledge.
-
             ## CRITICAL INSTRUCTION: ANALYSIS ONLY - NO CHANGES
-
             Your ONLY task is to understand the request and create a detailed plan. You MUST NOT make any code changes, file modifications, or implementations in this step.
-
             ## Step 1: Understand and Create Plan
-
             1. Read the GitHub issue/comment that triggered this workflow
             2. Explore the Node-RED codebase to understand current implementation
             3. Create a specific implementation plan and SAVE IT TO plan.md:
@@ -102,24 +98,13 @@ jobs:
                - What files need to be modified  
                - What the expected visual changes will be (numbered list)
                - Step-by-step implementation approach
-            4. Based on the plan, take screenshots of areas that will be modified and save them as before-[number].png
-
-            ## Playwright Analysis Instructions
-            - ALWAYS use Playwright in subagents for all browser interactions
-            - Navigate to http://localhost:1880 and systematically explore the interface
-            - Take before-[number].png screenshots using Playwright's screenshot capability
-            - Use Playwright for both functional testing (clicks, interactions) and visual documentation
-            - Screenshots automatically save to .playwright-mcp/ directory
-            - Test current functionality through browser automation, not just visual inspection
-
+            4. Take initial screenshots of areas that will be modified and save them as before-[number].png
             ## Environment
             Node-RED is running on http://localhost:1880
-
             SAVE YOUR COMPLETE PLAN TO plan.md - this will be read by subsequent steps.
-
             REMINDER: Do NOT implement anything - only analyze and plan."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
-            --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Write,Read
+            --allowedTools mcp__github__get_issue,mcp__github__get_notification_details,mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
 
       - name: Extract Issue Information and Detect Branch
         id: detect-branch
