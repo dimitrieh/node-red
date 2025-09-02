@@ -136,63 +136,72 @@ jobs:
             echo "Node-RED is running properly"
           fi
 
+      # Create CLAUDE.md with step 2 instructions
+      - name: Create CLAUDE.md for Step 2
+        run: |
+          cat > CLAUDE.md << 'EOF'
+          You are an expert Node-RED developer with strong UI/UX design knowledge.
+          ## CRITICAL INSTRUCTION: IMPLEMENT CHANGES THROUGH ITERATIVELY TESTING CHANGES AND REFINING BASED ON PLAYWRIGHT FEEDBACK
+          You are continuing the work from Step 1 by implementing changes for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
+          ## Context from Step 1:
+          - Implementation plan is saved in plan.md - READ THIS FIRST
+          - Node-RED server should be running on http://localhost:1880 (verify with curl) otherwise restart it
+          ## Step 2: Implement and iteratively adjust based on Playwright testing until completion of plan
+          You are working on the implementation phase with iterative testing and refinement. Follow this process:
+          ### MANDATORY Implementation Loop Process
+          1. READ the detailed plan from plan.md - this contains the complete implementation strategy created in Step 1
+          2. Make SMALL incremental changes (not the entire implementation at once)
+          3. For frontend changes: run npm run build to rebuild assets
+          4. For backend/core changes: restart Node-RED if needed using:
+          kill $(cat node-red.pid) && npm start & && echo $! > node-red.pid && sleep 10
+          5. **MANDATORY: Navigate to http://localhost:1880 and test with Playwright**
+          6. **MANDATORY: Take screenshot and analyze what you see vs what was expected**
+          7. **If testing reveals issues: make additional changes and repeat from step 3**
+          8. **Repeat steps 2-7 until each small change is verified working**
+          9. **ONLY consider complete when Playwright confirms all functionality works correctly**
+          ## CRITICAL: You MUST test each change with Playwright before proceeding
+          - Do NOT implement multiple features without testing each one
+          - Do NOT assume your code works - verify with browser automation
+          - Use Playwright to see the actual visual result after every change
+          ## Playwright-Driven Iterative Development
+          - ALWAYS use Playwright for all browser testing and feedback
+          - Use Playwright to discover what needs adjustment: UI layout, functionality, user experience
+          - Let Playwright testing guide your implementation decisions
+          - After each code change, immediately test with Playwright browser automation
+          - Use Playwright findings to refine and improve the implementation
+          - Continue the implement → test → refine cycle until Playwright confirms success
+          ## ABSOLUTE REQUIREMENT: Let Playwright Drive Improvements
+          - NEVER implement code without immediately testing it with Playwright
+          - Don't just implement the plan - let Playwright testing show you what actually works
+          - Use browser automation to discover edge cases and usability issues
+          - Make iterative improvements based on what you observe through Playwright
+          - The plan is your starting point, but Playwright testing should guide refinements
+          - If you complete Step 2 without using Playwright extensively, you have FAILED
+          ## Implementation Guidelines
+          - Apply UI/UX best practices based on what Playwright testing reveals: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing. Adherence to existing design patterns takes priority unless requested differently. Do not extend scope unnecessarily.
+          - Maintain consistency with existing interface patterns
+          - Focus on what the plan specifies, but improve based on testing feedback
+          - Don't stop at good enough - iterate until Playwright confirms functional and visual excellence
+          ## Environment
+          - Node-RED is running on http://localhost:1880
+          - You are working on branch: ${{ env.CLAUDE_BRANCH }}
+          - The plan file contains your starting strategy - use it with Playwright feedback
+          Begin iterative implementation now.
+          EOF
+
       # Step 2: Implementation based on saved plan
       - name: Step 2 - Implement and Test Changes
         id: implement-changes
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt:
-            "You are an expert Node-RED developer with strong UI/UX design knowledge.
-            ## CRITICAL INSTRUCTION: IMPLEMENT CHANGES THROUGH ITERATIVELY TESTING CHANGES AND REFINING BASED ON PLAYWRIGHT FEEDBACK
-            You are continuing the work from Step 1 by implementing changes for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
-            ## Context from Step 1:
-            - Implementation plan is saved in plan.md - READ THIS FIRST
-            - Node-RED server should be running on http://localhost:1880 (verify with curl) otherwise restart it
-            ## Step 2: Implement and iteratively adjust based on Playwright testing until completion of plan
-            You are working on the implementation phase with iterative testing and refinement. Follow this process:
-            ### MANDATORY Implementation Loop Process
-            1. READ the detailed plan from plan.md - this contains the complete implementation strategy created in Step 1
-            2. Make SMALL incremental changes (not the entire implementation at once)
-            3. For frontend changes: run npm run build to rebuild assets
-            4. For backend/core changes: restart Node-RED if needed using:
-            kill $(cat node-red.pid) && npm start & && echo $! > node-red.pid && sleep 10
-            5. **MANDATORY: Navigate to http://localhost:1880 and test with Playwright**
-            6. **MANDATORY: Take screenshot and analyze what you see vs what was expected**
-            7. **If testing reveals issues: make additional changes and repeat from step 3**
-            8. **Repeat steps 2-7 until each small change is verified working**
-            9. **ONLY consider complete when Playwright confirms all functionality works correctly**
-            ## CRITICAL: You MUST test each change with Playwright before proceeding
-            - Do NOT implement multiple features without testing each one
-            - Do NOT assume your code works - verify with browser automation
-            - Use Playwright to see the actual visual result after every change
-            ## Playwright-Driven Iterative Development
-            - ALWAYS use Playwright for all browser testing and feedback
-            - Use Playwright to discover what needs adjustment: UI layout, functionality, user experience
-            - Let Playwright testing guide your implementation decisions
-            - After each code change, immediately test with Playwright browser automation
-            - Use Playwright findings to refine and improve the implementation
-            - Continue the implement → test → refine cycle until Playwright confirms success
-            ## ABSOLUTE REQUIREMENT: Let Playwright Drive Improvements
-            - NEVER implement code without immediately testing it with Playwright
-            - Don't just implement the plan - let Playwright testing show you what actually works
-            - Use browser automation to discover edge cases and usability issues
-            - Make iterative improvements based on what you observe through Playwright
-            - The plan is your starting point, but Playwright testing should guide refinements
-            - If you complete Step 2 without using Playwright extensively, you have FAILED
-            ## Implementation Guidelines
-            - Apply UI/UX best practices based on what Playwright testing reveals: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing. Adherence to existing design patterns takes priority unless requested differently. Do not extend scope unnecessarily.
-            - Maintain consistency with existing interface patterns
-            - Focus on what the plan specifies, but improve based on testing feedback
-            - Don't stop at good enough - iterate until Playwright confirms functional and visual excellence
-            ## Environment
-            - Node-RED is running on http://localhost:1880
-            - You are working on branch: ${{ env.CLAUDE_BRANCH }}
-            - The plan file contains your starting strategy - use it with Playwright feedback
-            Begin iterative implementation now."
           claude_args: |
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Read,Write,Edit,MultiEdit,Bash
+
+      # Remove CLAUDE.md after Step 2
+      - name: Remove CLAUDE.md after Step 2
+        run: rm -f CLAUDE.md
 
       # Ensure Node-RED is running before Step 3
       - name: Verify Node-RED Status Before Step 3
