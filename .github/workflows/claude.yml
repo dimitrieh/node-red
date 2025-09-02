@@ -351,30 +351,60 @@ jobs:
             git worktree add ../gh-pages-deploy gh-pages
           }
 
-          # Copy screenshot directories preserving ISSUE_ID/COMMIT_HASH structure
-          if [ -d "./screenshots" ]; then
-            cp -r ./screenshots/* "../gh-pages-deploy/" 2>/dev/null || true
-          fi
-
-          # Switch to worktree and commit
+          # Switch to worktree 
           cd ../gh-pages-deploy
 
-          # Check if there are any changes to commit
-          if [ -n "$(git status --porcelain)" ]; then
-            git add .
-            COMMIT_HASH_BEFORE_PUSH=$(git rev-parse HEAD)
-            git commit -m "Add screenshots from workflow run ${{ github.run_id }}
+          # Copy screenshots and restructure with correct commit hash
+          if [ -d "../screenshots" ]; then
+            # First, stage and commit to get the NEW commit hash
+            cp -r ../screenshots/* . 2>/dev/null || true
+            
+            # Check if there are any changes to commit
+            if [ -n "$(git status --porcelain)" ]; then
+              git add .
+              git commit -m "Add screenshots from workflow run ${{ github.run_id }}
 
-            Event: ${{ github.event_name }}
-            Repository: ${{ github.repository }}
-            Run ID: ${{ github.run_id }}"
+              Event: ${{ github.event_name }}
+              Repository: ${{ github.repository }}
+              Run ID: ${{ github.run_id }}"
 
-            git push origin gh-pages
-            echo "Screenshots deployed to gh-pages"
-            echo "deploy_success=true" >> $GITHUB_OUTPUT
-            echo "commit_hash=$COMMIT_HASH_BEFORE_PUSH" >> $GITHUB_OUTPUT
+              # Get the NEW commit hash after commit is created
+              NEW_COMMIT_HASH=$(git rev-parse HEAD)
+              
+              # Now restructure the files to use the correct NEW commit hash
+              ISSUE_NUMBER="${{ needs.claude.outputs.issue-id }}"
+              
+              # Find the temporary directory structure (uses original commit hash)
+              for temp_dir in */; do
+                if [ -d "$temp_dir" ] && [ "$temp_dir" != "${ISSUE_NUMBER}/" ]; then
+                  # Create correct directory structure
+                  mkdir -p "${ISSUE_NUMBER}/${NEW_COMMIT_HASH}"
+                  
+                  # Move screenshots to correct location
+                  if [ -d "${temp_dir}" ]; then
+                    mv "${temp_dir}"* "${ISSUE_NUMBER}/${NEW_COMMIT_HASH}/" 2>/dev/null || true
+                    rmdir "${temp_dir}" 2>/dev/null || true
+                  fi
+                fi
+              done
+              
+              # If files were restructured, commit the changes
+              if [ -n "$(git status --porcelain)" ]; then
+                git add .
+                git commit --amend --no-edit
+                NEW_COMMIT_HASH=$(git rev-parse HEAD)
+              fi
+              
+              git push origin gh-pages
+              echo "Screenshots deployed to gh-pages"
+              echo "deploy_success=true" >> $GITHUB_OUTPUT
+              echo "commit_hash=$NEW_COMMIT_HASH" >> $GITHUB_OUTPUT
+            else
+              echo "No screenshots to deploy"
+              echo "deploy_success=false" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "No screenshots to deploy"
+            echo "No screenshots directory found"
             echo "deploy_success=false" >> $GITHUB_OUTPUT
           fi
 
@@ -398,6 +428,14 @@ jobs:
           # Check for screenshot pairs across different numbering and resolution patterns
           SCREENSHOTS_FOUND=false
           cd ../gh-pages-deploy
+          
+          # Verify the directory structure exists
+          if [ -d "${ISSUE_NUMBER}/${COMMIT_HASH}" ]; then
+            echo "Found screenshot directory: ${ISSUE_NUMBER}/${COMMIT_HASH}"
+            ls -la "${ISSUE_NUMBER}/${COMMIT_HASH}/"
+          else
+            echo "Screenshot directory not found: ${ISSUE_NUMBER}/${COMMIT_HASH}"
+          fi
           
           for i in {1..5}; do
             SECTION_FOUND=false
