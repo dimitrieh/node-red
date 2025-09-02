@@ -280,10 +280,7 @@ jobs:
           if [ -d ".playwright-mcp" ]; then
             # Use bash arrays to safely handle files that may or may not exist
             shopt -s nullglob  # Make glob patterns expand to nothing if no matches
-            for file in .playwright-mcp/before-*.png; do
-              [ -f "$file" ] && cp "$file" "$SCREENSHOT_DIR/"
-            done
-            for file in .playwright-mcp/after-*.png; do
+            for file in .playwright-mcp/before-*.png .playwright-mcp/after-*.png; do
               [ -f "$file" ] && cp "$file" "$SCREENSHOT_DIR/"
             done
             shopt -u nullglob  # Reset nullglob
