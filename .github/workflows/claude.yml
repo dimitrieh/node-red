@@ -317,7 +317,7 @@ jobs:
   deploy-screenshots:
     needs: claude
     runs-on: ubuntu-latest
-    if: always() && needs.claude.result != 'cancelled'
+    if: needs.claude.result == 'success'
     permissions:
       contents: write # Required to push to gh-pages branch
     steps:
