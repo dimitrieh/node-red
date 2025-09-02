@@ -140,16 +140,22 @@ jobs:
 
             You are working on the implementation phase with iterative testing and refinement. Follow this process:
 
-            ## Implementation Loop Process
+            ## MANDATORY Implementation Loop Process
             1. READ the detailed plan from plan.md - this contains the complete implementation strategy created in Step 1
-            2. Implement changes based on the plan
+            2. Make SMALL incremental changes (not the entire implementation at once)
             3. For frontend changes: run npm run build to rebuild assets
             4. For backend/core changes: restart Node-RED if needed using:
                kill $(cat node-red.pid) && npm start & && echo $! > node-red.pid && sleep 10
-            5. **Test with Playwright and analyze results**
-            6. **If testing reveals issues or improvements needed: analyse and make additional changes**
-            7. **Repeat steps 3-6 until the implementation meets requirements**
-            8. Only consider complete when Playwright testing confirms all functionality works correctly
+            5. **MANDATORY: Navigate to http://localhost:1880 and test with Playwright**
+            6. **MANDATORY: Take screenshot and analyze what you see vs what was expected**
+            7. **If testing reveals issues: make additional changes and repeat from step 3**
+            8. **Repeat steps 2-7 until each small change is verified working**
+            9. **ONLY consider complete when Playwright confirms all functionality works correctly**
+            
+            ## CRITICAL: You MUST test each change with Playwright before proceeding
+            - Do NOT implement multiple features without testing each one
+            - Do NOT assume your code works - verify with browser automation
+            - Use Playwright to see the actual visual result after every change
 
             ## Playwright-Driven Iterative Development
             - ALWAYS use Playwright in subagents for all browser testing and feedback
@@ -161,11 +167,13 @@ jobs:
             - Continue the implement → test → refine cycle until Playwright confirms success
             - Screenshots automatically save to .playwright-mcp/ directory
 
-            ## Key Philosophy: Let Playwright Drive Improvements
+            ## ABSOLUTE REQUIREMENT: Let Playwright Drive Improvements
+            - NEVER implement code without immediately testing it with Playwright
             - Don't just implement the plan - let Playwright testing show you what actually works
             - Use browser automation to discover edge cases and usability issues
             - Make iterative improvements based on what you observe through Playwright
             - The plan is your starting point, but Playwright testing should guide refinements
+            - If you complete Step 2 without using Playwright extensively, you have FAILED
 
             ## Implementation Guidelines
             - Apply UI/UX best practices based on what Playwright testing reveals: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing. Adherence to existing design patterns takes priority unless requested differently. Do not extend scope unnecessarily.
@@ -338,6 +346,8 @@ jobs:
           # Switch to worktree and commit
           cd ../gh-pages-deploy
 
+          # Disable sparse-checkout in gh-pages worktree
+          git sparse-checkout disable
           git add .
           git commit -m "Add screenshots for issue #${{ env.ISSUE_ID }}, commit ${COMMIT_HASH:0:7}
 
