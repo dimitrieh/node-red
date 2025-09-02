@@ -354,8 +354,8 @@ jobs:
           cd ../gh-pages-deploy
 
           # Copy screenshots with run ID structure (no restructuring needed)
-          if [ -d "../screenshots" ]; then
-            cp -r ../screenshots/* . 2>/dev/null || true
+          if [ -d "../node-red/screenshots" ]; then
+            cp -r ../node-red/screenshots/* . 2>/dev/null || true
             
             # Check if there are any changes to commit
             if [ -n "$(git status --porcelain)" ]; then
