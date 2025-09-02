@@ -323,6 +323,7 @@ jobs:
     if: needs.claude.result == 'success'
     permissions:
       contents: write # Required to push to gh-pages branch
+      issues: write # Required to post comments on issues
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -336,6 +337,7 @@ jobs:
           path: ./screenshots
 
       - name: Deploy Screenshots to gh-pages
+        id: deploy
         run: |
           # Set up git config for commits
           git config --global user.name "github-actions[bot]"
@@ -349,9 +351,9 @@ jobs:
             git worktree add ../gh-pages-deploy gh-pages
           }
 
-          # Copy all screenshot directories to the worktree
+          # Copy screenshot directories preserving ISSUE_ID/COMMIT_HASH structure
           if [ -d "./screenshots" ]; then
-            cp -r ./screenshots/. "../gh-pages-deploy/" 2>/dev/null || true
+            cp -r ./screenshots/* "../gh-pages-deploy/" 2>/dev/null || true
           fi
 
           # Switch to worktree and commit
@@ -360,6 +362,7 @@ jobs:
           # Check if there are any changes to commit
           if [ -n "$(git status --porcelain)" ]; then
             git add .
+            COMMIT_HASH_BEFORE_PUSH=$(git rev-parse HEAD)
             git commit -m "Add screenshots from workflow run ${{ github.run_id }}
 
             Event: ${{ github.event_name }}
@@ -368,7 +371,76 @@ jobs:
 
             git push origin gh-pages
             echo "Screenshots deployed to gh-pages"
+            echo "deploy_success=true" >> $GITHUB_OUTPUT
+            echo "commit_hash=$COMMIT_HASH_BEFORE_PUSH" >> $GITHUB_OUTPUT
           else
             echo "No screenshots to deploy"
+            echo "deploy_success=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post Comparison Comment
+        if: steps.deploy.outputs.deploy_success == 'true'
+        run: |
+          # Get variables for comment generation
+          ISSUE_NUMBER="${{ needs.claude.outputs.issue-id }}"
+          COMMIT_HASH="${{ steps.deploy.outputs.commit_hash }}"
+          REPO_OWNER="${{ github.repository_owner }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+          IMAGE_BASE_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}/${ISSUE_NUMBER}/${COMMIT_HASH}"
+          
+          echo "Generating comparison comment for issue #${ISSUE_NUMBER}"
+          echo "Using commit hash: ${COMMIT_HASH}"
+          echo "Base URL: ${IMAGE_BASE_URL}"
+          
+          # Build comparison comment
+          COMMENT_BODY="## 📸 Visual Comparison\n\n"
+          
+          # Check for screenshot pairs across different numbering and resolution patterns
+          SCREENSHOTS_FOUND=false
+          cd ../gh-pages-deploy
+          
+          for i in {1..5}; do
+            SECTION_FOUND=false
+            SECTION_BODY=""
+            
+            # Check each resolution for this screenshot number
+            for RESOLUTION in "desktop:Desktop (1920x1080)" "laptop:Laptop (1440x900)" "tablet:Tablet (768x1024)" "mobile:Mobile (375x667)"; do
+              RES_SUFFIX=$(echo $RESOLUTION | cut -d: -f1)
+              RES_NAME=$(echo $RESOLUTION | cut -d: -f2)
+              
+              BEFORE_FILE="${ISSUE_NUMBER}/${COMMIT_HASH}/before-${i}-${RES_SUFFIX}.png"
+              AFTER_FILE="${ISSUE_NUMBER}/${COMMIT_HASH}/after-${i}-${RES_SUFFIX}.png"
+              
+              if [ -f "$BEFORE_FILE" ] && [ -f "$AFTER_FILE" ]; then
+                if [ "$SECTION_FOUND" = false ]; then
+                  SECTION_BODY="### Screenshot ${i}\n\n| Resolution | Before | After |\n|------------|--------|-------|\n"
+                  SECTION_FOUND=true
+                fi
+                
+                SECTION_BODY="${SECTION_BODY}| ${RES_NAME} | ![Before ${i} ${RES_SUFFIX}](${IMAGE_BASE_URL}/before-${i}-${RES_SUFFIX}.png) | ![After ${i} ${RES_SUFFIX}](${IMAGE_BASE_URL}/after-${i}-${RES_SUFFIX}.png) |\n"
+                SCREENSHOTS_FOUND=true
+                echo "Found screenshot pair: ${i}-${RES_SUFFIX}"
+              fi
+            done
+            
+            if [ "$SECTION_FOUND" = true ]; then
+              COMMENT_BODY="${COMMENT_BODY}${SECTION_BODY}\n"
+            fi
+          done
+          
+          # Post comment if screenshots were found
+          if [ "$SCREENSHOTS_FOUND" = true ]; then
+            echo "Posting comparison comment to issue #${ISSUE_NUMBER}"
+            
+            curl -X POST \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${ISSUE_NUMBER}/comments" \
+              -d "{\"body\":\"${COMMENT_BODY}\"}"
+            
+            echo "Successfully posted comparison comment"
+          else
+            echo "No screenshot pairs found for comparison"
+            ls -la "${ISSUE_NUMBER}/${COMMIT_HASH}/" || echo "Screenshot directory not found"
           fi
 
