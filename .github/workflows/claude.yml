@@ -348,7 +348,7 @@ jobs:
 
           # Copy all screenshot directories to the worktree
           if [ -d "./screenshots" ]; then
-            cp -r ./screenshots/* "../gh-pages-deploy/" 2>/dev/null || true
+            cp -r ./screenshots/. "../gh-pages-deploy/" 2>/dev/null || true
           fi
 
           # Switch to worktree and commit
