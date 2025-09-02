@@ -218,61 +218,49 @@ jobs:
           echo "ISSUE_ID=$ISSUE_NUMBER" >> $GITHUB_ENV
           echo "Issue/PR Number: $ISSUE_NUMBER"
 
-      # Step 3: Validation and documentation
-      - name: Step 3 - Validate and Document Results
+      # Step 3: Screenshot documentation
+      - name: Step 3 - Take After Screenshots
         id: post-comparison
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            You are an expert Node-RED developer with strong UI/UX design knowledge.
+            You are a screenshot automation tool.
 
-            ## Step 3: Validate and Document for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
+            ## CRITICAL INSTRUCTION: SCREENSHOTS ONLY - NO CODE MODIFICATIONS
+            You are in the FINAL SCREENSHOT phase. Your ONLY permitted actions are:
+            - READ plan.md ONLY to find which UI areas need screenshots (do NOT implement the plan)
+            - TAKE SCREENSHOTS using Playwright
+            - WRITE screenshot files (after-*.png) only
 
-            You are completing the final phase on branch: ${{ env.CLAUDE_BRANCH }}
+            YOU MUST NOT:
+            - Modify any source code files (.js, .html, .css, .json, etc.)
+            - Make additional implementations or "improvements"  
+            - Change Node-RED functionality in any way
+            - Edit existing implementation files
 
-            ## Context from Step 2:
-            - Check what was implemented: git diff HEAD~1 --name-only
-            - Verify Node-RED server is running: curl -f http://localhost:1880 || restart server
-            - Match before screenshots: take after-N.png for each before-N.png found
-            - If server down: npm start & && echo $! > node-red.pid && sleep 15
 
-            You are in the final validation and documentation phase. Complete these steps:
+            ## Step 3: Take After Screenshots for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
 
-            1. READ the plan from plan.md to understand what was supposed to be implemented
-            2. Understand changes made for plan
-            3. Find the screenshots with naming convention before-[number].png and take final counterpart screenshots as after-[number].png matching any before screenshots from Step 1
+            You are taking final screenshots on branch: ${{ env.CLAUDE_BRANCH }}
+
+            ## Your Screenshot Tasks:
+            1. FIND existing before-*.png screenshots that Step 1 created
+            2. For each before-N.png found, take a matching after-N.png screenshot
+            3. Navigate to http://localhost:1880 and capture the same areas
 
             ## Playwright Usage
             - Take after-[number].png screenshots using Playwright's screenshot capability
-            - Navigate systematically through every changed UI area
-            - Verify screenshots are properly saved to .playwright-mcp/ directory
+            - Save screenshots to .playwright-mcp/ directory
 
             ## Environment
             - Node-RED is running on http://localhost:1880
             - You are working on branch: ${{ env.CLAUDE_BRANCH }}
-            - Implementation should be complete from Step 2
 
-            Use this markdown format for your GitHub comment:
+            ## REMINDER: SCREENSHOTS ONLY
+            Your ONLY task is to take after-N.png screenshots that match the before-N.png screenshots from Step 1. Do NOT create reports or modify any code files.
 
-            ## 🎨 Node-RED Interface Implementation Complete
-
-            ### Implementation Plan
-            [Include the full plan from plan.md]
-
-            ### Visual Changes
-            | Area | Before | After |
-            |------|--------|-------|
-            | [Area 1] | ![Before](path/to/before-1.png) | ![After](path/to/after-1.png) |
-            | [Area 2] | ![Before](path/to/before-2.png) | ![After](path/to/after-2.png) |
-
-            ### Summary
-            - ✅ [Change 1 completed]
-            - ✅ [Change 2 completed]
-
-            All requested changes have been implemented and tested successfully.
-
-            Begin validation now.
+            Begin taking screenshots now.
           claude_args: |
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
             --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
