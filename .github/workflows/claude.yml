@@ -121,13 +121,18 @@ jobs:
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Write,Read
 
-      - name: Detect Branch Created by Step 1
+      - name: Extract Issue Information and Detect Branch
         id: detect-branch
         run: |
           BRANCH=$(git branch --show-current)
           echo "Step 1 created/used branch: $BRANCH"
           echo "branch_name=$BRANCH" >> $GITHUB_OUTPUT
           echo "CLAUDE_BRANCH=$BRANCH" >> $GITHUB_ENV
+          
+          # Extract issue/PR number for folder structure
+          ISSUE_NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
+          echo "ISSUE_ID=$ISSUE_NUMBER" >> $GITHUB_ENV
+          echo "Issue/PR Number: $ISSUE_NUMBER"
 
       - name: Clean Git State After Step 1
         run: |
@@ -255,30 +260,49 @@ jobs:
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
             --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Read,Write
 
-      # Archive screenshots with commit hash
-      - name: Archive Screenshots to Commit-Named Folder
+      # Archive screenshots with issue and commit hash
+      - name: Archive Screenshots to Issue/Commit Folder
         if: always() && steps.post-comparison.conclusion != 'skipped'
         run: |
           # Get the last commit hash
           COMMIT_HASH=$(git rev-parse HEAD)
-          SCREENSHOT_DIR="${COMMIT_HASH}"
+          SCREENSHOT_DIR="${{ env.ISSUE_ID }}/${COMMIT_HASH}"
           
-          # Create directory named after commit hash
+          # Create directory with issue/commit structure
           mkdir -p "$SCREENSHOT_DIR"
           
           # Copy only before-*.png and after-*.png screenshots to commit folder
           if [ -d ".playwright-mcp" ]; then
-            cp .playwright-mcp/before-*.png "$SCREENSHOT_DIR/" 2>/dev/null || true
-            cp .playwright-mcp/after-*.png "$SCREENSHOT_DIR/" 2>/dev/null || true
+            # Use bash arrays to safely handle files that may or may not exist
+            shopt -s nullglob  # Make glob patterns expand to nothing if no matches
+            for file in .playwright-mcp/before-*.png; do
+              [ -f "$file" ] && cp "$file" "$SCREENSHOT_DIR/"
+            done
+            for file in .playwright-mcp/after-*.png; do
+              [ -f "$file" ] && cp "$file" "$SCREENSHOT_DIR/"
+            done
+            shopt -u nullglob  # Reset nullglob
           fi
           
-          # Save commit hash for later use
+          # Create metadata file for GitHub Pages workflow
+          cat > "$SCREENSHOT_DIR/metadata.json" << EOF
+{
+  "issue_number": "${{ env.ISSUE_ID }}",
+  "commit_hash": "$COMMIT_HASH",
+  "repository_owner": "${{ github.repository_owner }}",
+  "repository_name": "${{ github.event.repository.name }}",
+  "event_type": "${{ github.event_name }}",
+  "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+          
+          # Save paths for later use
           echo "$COMMIT_HASH" > current_commit.txt
           echo "$SCREENSHOT_DIR" > screenshot_dir.txt
           
-          # Stash only the screenshot directory
+          # Stash the screenshot directory
           git add "$SCREENSHOT_DIR"
-          git stash push -m "Screenshots for $COMMIT_HASH" -- "$SCREENSHOT_DIR"
+          git stash push -m "Screenshots for issue #${{ env.ISSUE_ID }}, commit $COMMIT_HASH" -- "$SCREENSHOT_DIR"
 
       # Push screenshots to gh-pages branch
       - name: Deploy Screenshots to gh-pages
@@ -291,44 +315,18 @@ jobs:
           # Apply the stashed screenshots
           git stash pop || true
           
-          # Commit and push
+          # Commit and push with metadata
           COMMIT_HASH=$(cat current_commit.txt 2>/dev/null || echo "unknown")
           git add .
-          git commit -m "Add screenshots for commit ${COMMIT_HASH:0:7}" || true
+          git commit -m "Add screenshots for issue #${{ env.ISSUE_ID }}, commit ${COMMIT_HASH:0:7}
+
+Metadata:
+- Issue/PR: #${{ env.ISSUE_ID }}
+- Commit: $COMMIT_HASH
+- Event: ${{ github.event_name }}
+- Folder: ${{ env.ISSUE_ID }}/$COMMIT_HASH" || true
           git push origin gh-pages
           
           # Go back to original branch
           git checkout "${{ env.CLAUDE_BRANCH }}"
 
-      # Create GitHub comment with before/after table
-      - name: Post Before/After Comparison to GitHub
-        if: always() && steps.post-comparison.conclusion != 'skipped'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          COMMIT_HASH=$(cat current_commit.txt)
-          ISSUE_NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
-          REPO_OWNER="${{ github.repository_owner }}"
-          REPO_NAME="${{ github.event.repository.name }}"
-          
-          # Base URL for images on GitHub Pages
-          IMAGE_BASE_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}/${COMMIT_HASH}"
-          
-          # Build the comment body with before/after table
-          COMMENT_BODY="| Before | After |
-          |--------|-------|"
-          
-          # Add rows for each pair of before/after screenshots
-          for i in 1 2 3 4 5; do
-            if [ -f "${COMMIT_HASH}/before-${i}.png" ] && [ -f "${COMMIT_HASH}/after-${i}.png" ]; then
-              COMMENT_BODY="${COMMENT_BODY}
-          | ![Before ${i}](${IMAGE_BASE_URL}/before-${i}.png) | ![After ${i}](${IMAGE_BASE_URL}/after-${i}.png) |"
-            fi
-          done
-          
-          # Post comment using GitHub API
-          curl -X POST \
-            -H "Authorization: token ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${ISSUE_NUMBER}/comments" \
-            -d "{\"body\":\"${COMMENT_BODY}\"}"
