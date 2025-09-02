@@ -18,6 +18,8 @@ jobs:
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     runs-on: ubuntu-latest
+    outputs:
+      issue-id: ${{ steps.detect-branch.outputs.issue_id }}
     permissions:
       contents: read
       pull-requests: read
@@ -216,6 +218,7 @@ jobs:
           # Extract issue/PR number for folder structure
           ISSUE_NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
           echo "ISSUE_ID=$ISSUE_NUMBER" >> $GITHUB_ENV
+          echo "issue_id=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
           echo "Issue/PR Number: $ISSUE_NUMBER"
 
       # Step 3: Screenshot documentation
@@ -301,13 +304,35 @@ jobs:
           }
           EOF
 
-          # Save paths for later use
-          echo "$COMMIT_HASH" > current_commit.txt
-          echo "$SCREENSHOT_DIR" > screenshot_dir.txt
-
-      # Push screenshots to gh-pages branch using worktree
-      - name: Deploy Screenshots to gh-pages
+      # Upload screenshots as artifact for deployment job
+      - name: Upload Screenshots Artifact
         if: always() && steps.post-comparison.conclusion != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-${{ env.ISSUE_ID }}-${{ github.run_id }}
+          path: ${{ env.ISSUE_ID }}/
+          retention-days: 1
+
+  # Separate job to deploy screenshots to gh-pages with write permissions
+  deploy-screenshots:
+    needs: claude
+    runs-on: ubuntu-latest
+    if: always() && needs.claude.result != 'cancelled'
+    permissions:
+      contents: write # Required to push to gh-pages branch
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Screenshots Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: screenshots-${{ needs.claude.outputs.issue-id }}-${{ github.run_id }}
+          path: ./screenshots
+
+      - name: Deploy Screenshots to gh-pages
         run: |
           # Set up git config for commits
           git config --global user.name "github-actions[bot]"
@@ -321,28 +346,25 @@ jobs:
             git worktree add ../gh-pages-deploy gh-pages
           }
 
-          # Copy the screenshot directory to the worktree
-          SCREENSHOT_DIR=$(cat screenshot_dir.txt)
-          COMMIT_HASH=$(cat current_commit.txt)
-
-          # Ensure parent directory exists in worktree
-          mkdir -p "../gh-pages-deploy/${{ env.ISSUE_ID }}"
-
-          # Copy entire screenshot directory structure
-          cp -r "$SCREENSHOT_DIR" "../gh-pages-deploy/"
+          # Copy all screenshot directories to the worktree
+          if [ -d "./screenshots" ]; then
+            cp -r ./screenshots/* "../gh-pages-deploy/" 2>/dev/null || true
+          fi
 
           # Switch to worktree and commit
           cd ../gh-pages-deploy
 
-          # Disable sparse-checkout in gh-pages worktree
-          git sparse-checkout disable
-          git add .
-          git commit -m "Add screenshots for issue #${{ env.ISSUE_ID }}, commit ${COMMIT_HASH:0:7}
+          # Check if there are any changes to commit
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "Add screenshots from workflow run ${{ github.run_id }}
 
-          Metadata:
-          - Issue/PR: #${{ env.ISSUE_ID }}
-          - Commit: $COMMIT_HASH
-          - Event: ${{ github.event_name }}
-          - Folder: ${{ env.ISSUE_ID }}/$COMMIT_HASH" || true
+            Event: ${{ github.event_name }}
+            Repository: ${{ github.repository }}
+            Run ID: ${{ github.run_id }}"
 
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git gh-pages
+            git push origin gh-pages
+            echo "Screenshots deployed to gh-pages"
+          else
+            echo "No screenshots to deploy"
+          fi
