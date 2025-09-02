@@ -101,10 +101,20 @@ jobs:
                - What the expected visual changes will be (numbered list)
                - Step-by-step implementation approach
                - UX considerations: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing. Adherence to existing design patterns takes priority unless requested differently. Do not extend scope unnecessarily.
-            4. Navigate to and take initial screenshots of areas that will be modified using playwright:
+            4. Navigate to and take comprehensive initial screenshots of ALL areas that will be modified using playwright:
+               - Identify all distinct UI areas/components that will be affected by the requested changes
+               - For EACH identified area, capture screenshots using this numbering system:
+                 * Area 1: Main editor/workspace - before-1-[resolution].png  
+                 * Area 2: Node palette - before-2-[resolution].png
+                 * Area 3: Sidebar - before-3-[resolution].png
+                 * Continue numbering for additional areas (before-4-, before-5-, etc.)
                - Use mcp__playwright__browser_resize to set each resolution before capturing
-               - Capture 4 resolutions: Desktop (1920x1080), Laptop (1440x900), Tablet (768x1024), Mobile (375x667)
-               - Save screenshots as before-[number]-[resolution].png format (e.g., before-1-desktop.png, before-1-laptop.png, etc.)
+               - Capture 4 resolutions for EACH area with these exact filenames:
+                 * Desktop (1920x1080) → before-1-desktop.png, before-2-desktop.png, etc.
+                 * Laptop (1440x900) → before-1-laptop.png, before-2-laptop.png, etc.
+                 * Tablet (768x1024) → before-1-tablet.png, before-2-tablet.png, etc.
+                 * Mobile (375x667) → before-1-mobile.png, before-2-mobile.png, etc.
+               - Navigate to different UI states/views if needed to capture all relevant areas
             ## Environment
             Node-RED is running on http://localhost:1880
             SAVE YOUR COMPLETE PLAN TO plan.md - this will be read by subsequent steps.
@@ -237,8 +247,11 @@ jobs:
             3. Navigate to http://localhost:1880 and capture the same areas at the same resolutions
             ## Multi-Resolution Screenshot Requirements:
             - Use mcp__playwright__browser_resize to match the resolution used in Step 1
-            - Capture all 4 resolutions: Desktop (1920x1080), Laptop (1440x900), Tablet (768x1024), Mobile (375x667)
-            - Save screenshots as after-[number]-[resolution].png format (e.g., after-1-desktop.png, after-1-laptop.png, etc.)
+            - Capture all 4 resolutions with these exact filenames:
+              * Desktop (1920x1080) → after-1-desktop.png, after-2-desktop.png, etc.
+              * Laptop (1440x900) → after-1-laptop.png, after-2-laptop.png, etc.
+              * Tablet (768x1024) → after-1-tablet.png, after-2-tablet.png, etc.
+              * Mobile (375x667) → after-1-mobile.png, after-2-mobile.png, etc.
             ## Playwright Usage
             - Take after-[number]-[resolution].png screenshots using Playwright's screenshot capability
             - Save screenshots to .playwright-mcp/ directory
