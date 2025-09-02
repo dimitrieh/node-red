@@ -102,7 +102,15 @@ jobs:
                - What files need to be modified  
                - What the expected visual changes will be (numbered list)
                - Step-by-step implementation approach
-            4. Take initial screenshots of areas that will be modified and save them as before-[number].png
+            4. Based on the plan, take screenshots of areas that will be modified and save them as before-[number].png
+
+            ## Playwright Analysis Instructions
+            - ALWAYS use Playwright in subagents for all browser interactions
+            - Navigate to http://localhost:1880 and systematically explore the interface
+            - Take before-[number].png screenshots using Playwright's screenshot capability
+            - Use Playwright for both functional testing (clicks, interactions) and visual documentation
+            - Screenshots automatically save to .playwright-mcp/ directory
+            - Test current functionality through browser automation, not just visual inspection
 
             ## Environment
             Node-RED is running on http://localhost:1880
@@ -111,7 +119,7 @@ jobs:
 
             REMINDER: Do NOT implement anything - only analyze and plan."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
-            --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
+            --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Write,Read
 
       - name: Detect Branch Created by Step 1
         id: detect-branch
@@ -139,27 +147,47 @@ jobs:
 
             You are continuing the work from Step 1 on branch: ${{ env.CLAUDE_BRANCH }}
 
-            You are working on the implementation phase. Follow these steps:
+            You are working on the implementation phase with iterative testing and refinement. Follow this process:
 
+            ## Implementation Loop Process
             1. READ the detailed plan from plan.md - this contains the complete implementation strategy created in Step 1
-            2. Follow the plan exactly as specified
+            2. Implement changes based on the plan
             3. For frontend changes: run npm run build to rebuild assets
             4. For backend/core changes: restart Node-RED if needed using:
                kill $(cat node-red.pid) && npm start & && echo $! > node-red.pid && sleep 10
-            5. Test changes using Playwright to ensure they work correctly
+            5. **Test with Playwright and analyze results**
+            6. **If testing reveals issues or improvements needed, make additional changes**
+            7. **Repeat steps 3-6 until the implementation meets requirements**
+            8. Only consider complete when Playwright testing confirms all functionality works correctly
+
+            ## Playwright-Driven Iterative Development
+            - ALWAYS use Playwright in subagents for all browser testing and feedback
+            - Use Playwright to discover what needs adjustment: UI layout, functionality, user experience
+            - Let Playwright testing guide your implementation decisions
+            - After each code change, immediately test with Playwright browser automation
+            - Use Playwright findings to refine and improve the implementation
+            - Take progress screenshots using Playwright's screenshot capability
+            - Continue the implement → test → refine cycle until Playwright confirms success
+            - Screenshots automatically save to .playwright-mcp/ directory
+
+            ## Key Philosophy: Let Playwright Drive Improvements
+            - Don't just implement the plan - let Playwright testing show you what actually works
+            - Use browser automation to discover edge cases and usability issues
+            - Make iterative improvements based on what you observe through Playwright
+            - The plan is your starting point, but Playwright testing should guide refinements
 
             ## Implementation Guidelines
-            - Apply UI/UX best practices ONLY to the specific changes being made
+            - Apply UI/UX best practices based on what Playwright testing reveals
             - Maintain consistency with existing interface patterns  
-            - STAY FOCUSED: Only implement what's in the plan
-            - Test thoroughly before considering complete
+            - Focus on what the plan specifies, but improve based on testing feedback
+            - Don't stop at "good enough" - iterate until Playwright confirms excellence
 
             ## Environment
             - Node-RED is running on http://localhost:1880
             - You are working on branch: ${{ env.CLAUDE_BRANCH }}
-            - The plan file contains all the details you need - refer to it throughout implementation
+            - The plan file contains your starting strategy - use it with Playwright feedback
 
-            Begin implementation now.
+            Begin iterative implementation now.
           claude_args: |
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Read,Write,Edit,MultiEdit,Bash
@@ -185,9 +213,18 @@ jobs:
             You are in the final validation and documentation phase. Complete these steps:
 
             1. READ the plan from plan.md to understand what was supposed to be implemented
-            2. Navigate to http://localhost:1880 and verify all changes work correctly, and if not do fixes as needed
+            2. Understand changes made for plan
             3. Take final screenshots as after-[number].png matching any before screenshots from Step 1
-            4. Create a comprehensive before/after comparison comment on the GitHub issue
+
+            ## Playwright Validation Protocol
+            - ALWAYS use Playwright in subagents for comprehensive testing
+            - Use Playwright for comprehensive functional testing of all changes
+            - Take after-[number].png screenshots using Playwright's screenshot capability
+            - Test all modified functionality through Playwright browser automation
+            - Navigate systematically through every changed UI area
+            - Verify both visual appearance and functional behavior with Playwright
+            - Include before/after Playwright screenshots in GitHub issue response
+            - Verify screenshots are properly saved to .playwright-mcp/ directory
 
             ## Environment
             - Node-RED is running on http://localhost:1880
@@ -213,7 +250,85 @@ jobs:
 
             All requested changes have been implemented and tested successfully.
 
-            Begin validation and documentation now.
+            Begin validation now.
           claude_args: |
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
-            --allowedTools mcp__github__add_issue_comment,mcp__github__get_issue,mcp__playwright__browser_navigate,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Read
+            --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Read,Write
+
+      # Archive screenshots with commit hash
+      - name: Archive Screenshots to Commit-Named Folder
+        if: always() && steps.post-comparison.conclusion != 'skipped'
+        run: |
+          # Get the last commit hash
+          COMMIT_HASH=$(git rev-parse HEAD)
+          SCREENSHOT_DIR="${COMMIT_HASH}"
+          
+          # Create directory named after commit hash
+          mkdir -p "$SCREENSHOT_DIR"
+          
+          # Copy only before-*.png and after-*.png screenshots to commit folder
+          if [ -d ".playwright-mcp" ]; then
+            cp .playwright-mcp/before-*.png "$SCREENSHOT_DIR/" 2>/dev/null || true
+            cp .playwright-mcp/after-*.png "$SCREENSHOT_DIR/" 2>/dev/null || true
+          fi
+          
+          # Save commit hash for later use
+          echo "$COMMIT_HASH" > current_commit.txt
+          echo "$SCREENSHOT_DIR" > screenshot_dir.txt
+          
+          # Stash only the screenshot directory
+          git add "$SCREENSHOT_DIR"
+          git stash push -m "Screenshots for $COMMIT_HASH" -- "$SCREENSHOT_DIR"
+
+      # Push screenshots to gh-pages branch
+      - name: Deploy Screenshots to gh-pages
+        if: always() && steps.post-comparison.conclusion != 'skipped'
+        run: |
+          # Fetch and checkout gh-pages branch
+          git fetch origin gh-pages:gh-pages || git checkout --orphan gh-pages
+          git checkout gh-pages
+          
+          # Apply the stashed screenshots
+          git stash pop || true
+          
+          # Commit and push
+          COMMIT_HASH=$(cat current_commit.txt 2>/dev/null || echo "unknown")
+          git add .
+          git commit -m "Add screenshots for commit ${COMMIT_HASH:0:7}" || true
+          git push origin gh-pages
+          
+          # Go back to original branch
+          git checkout "${{ env.CLAUDE_BRANCH }}"
+
+      # Create GitHub comment with before/after table
+      - name: Post Before/After Comparison to GitHub
+        if: always() && steps.post-comparison.conclusion != 'skipped'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMIT_HASH=$(cat current_commit.txt)
+          ISSUE_NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
+          REPO_OWNER="${{ github.repository_owner }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+          
+          # Base URL for images on GitHub Pages
+          IMAGE_BASE_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}/${COMMIT_HASH}"
+          
+          # Build the comment body with before/after table
+          COMMENT_BODY="| Before | After |
+          |--------|-------|"
+          
+          # Add rows for each pair of before/after screenshots
+          for i in 1 2 3 4 5; do
+            if [ -f "${COMMIT_HASH}/before-${i}.png" ] && [ -f "${COMMIT_HASH}/after-${i}.png" ]; then
+              COMMENT_BODY="${COMMENT_BODY}
+          | ![Before ${i}](${IMAGE_BASE_URL}/before-${i}.png) | ![After ${i}](${IMAGE_BASE_URL}/after-${i}.png) |"
+            fi
+          done
+          
+          # Post comment using GitHub API
+          curl -X POST \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${ISSUE_NUMBER}/comments" \
+            -d "{\"body\":\"${COMMENT_BODY}\"}"
