@@ -104,27 +104,7 @@ jobs:
             SAVE YOUR COMPLETE PLAN TO plan.md - this will be read by subsequent steps.
             REMINDER: Do NOT implement anything - only analyze and plan."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
-            --allowedTools mcp__github__get_issue,mcp__github__get_notification_details,mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
-
-      - name: Extract Issue Information and Detect Branch
-        id: detect-branch
-        run: |
-          BRANCH=$(git branch --show-current)
-          echo "Step 1 created/used branch: $BRANCH"
-          echo "branch_name=$BRANCH" >> $GITHUB_OUTPUT
-          echo "CLAUDE_BRANCH=$BRANCH" >> $GITHUB_ENV
-
-          # Extract issue/PR number for folder structure
-          ISSUE_NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
-          echo "ISSUE_ID=$ISSUE_NUMBER" >> $GITHUB_ENV
-          echo "Issue/PR Number: $ISSUE_NUMBER"
-
-      - name: Clean Git State After Step 1
-        run: |
-          git add -A
-          git stash --include-untracked || true
-          git clean -fd
-        continue-on-error: true
+            --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
 
       # Step 2: Implementation based on saved plan
       - name: Step 2 - Implement and Test Changes
@@ -182,12 +162,18 @@ jobs:
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Read,Write,Edit,MultiEdit,Bash
 
-      - name: Clean Git State After Step 2
+      - name: Extract Issue Information and Detect Branch
+        id: detect-branch
         run: |
-          git add -A
-          git stash --include-untracked || true
-          git clean -fd
-        continue-on-error: true
+          BRANCH=$(git branch --show-current)
+          echo "Step 1 created/used branch: $BRANCH"
+          echo "branch_name=$BRANCH" >> $GITHUB_OUTPUT
+          echo "CLAUDE_BRANCH=$BRANCH" >> $GITHUB_ENV
+
+          # Extract issue/PR number for folder structure
+          ISSUE_NUMBER="${{ github.event.issue.number || github.event.pull_request.number }}"
+          echo "ISSUE_ID=$ISSUE_NUMBER" >> $GITHUB_ENV
+          echo "Issue/PR Number: $ISSUE_NUMBER"
 
       # Step 3: Validation and documentation
       - name: Step 3 - Validate and Document Results
@@ -206,14 +192,9 @@ jobs:
             2. Understand changes made for plan
             3. Take final screenshots as after-[number].png matching any before screenshots from Step 1
 
-            ## Playwright Validation Protocol
-            - ALWAYS use Playwright in subagents for comprehensive testing
-            - Use Playwright for comprehensive functional testing of all changes
+            ## Playwright Usage
             - Take after-[number].png screenshots using Playwright's screenshot capability
-            - Test all modified functionality through Playwright browser automation
             - Navigate systematically through every changed UI area
-            - Verify both visual appearance and functional behavior with Playwright
-            - Include before/after Playwright screenshots in GitHub issue response
             - Verify screenshots are properly saved to .playwright-mcp/ directory
 
             ## Environment
@@ -243,7 +224,7 @@ jobs:
             Begin validation now.
           claude_args: |
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
-            --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Read,Write
+            --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
 
       # Archive screenshots with issue and commit hash
       - name: Archive Screenshots to Issue/Commit Folder
