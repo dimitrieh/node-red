@@ -38,3 +38,15 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # Log the structure for debugging run ID based screenshots
+      - name: Log Screenshot Structure
+        run: |
+          echo "📂 Checking screenshot directory structure:"
+          find . -name "*.png" -path "*/[0-9]*/*" | head -20 || echo "No screenshots found"
+          
+          echo "📁 Directory structure:"
+          ls -la */ 2>/dev/null | head -20 || echo "No numbered directories found"
+          
+          echo "🔍 Looking for metadata files:"
+          find . -name "metadata.json" -exec echo "Found: {}" \; -exec cat {} \; || echo "No metadata files found"
