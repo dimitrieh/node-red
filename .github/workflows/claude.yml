@@ -129,7 +129,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             You are an expert Node-RED developer with strong UI/UX design knowledge.
-            
+
             ## Step 2: Implement Changes for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
 
             You are continuing the work from Step 1 on branch: ${{ env.CLAUDE_BRANCH }}
@@ -151,14 +151,14 @@ jobs:
             7. **If testing reveals issues: make additional changes and repeat from step 3**
             8. **Repeat steps 2-7 until each small change is verified working**
             9. **ONLY consider complete when Playwright confirms all functionality works correctly**
-            
+
             ## CRITICAL: You MUST test each change with Playwright before proceeding
             - Do NOT implement multiple features without testing each one
             - Do NOT assume your code works - verify with browser automation
             - Use Playwright to see the actual visual result after every change
 
             ## Playwright-Driven Iterative Development
-            - ALWAYS use Playwright in subagents for all browser testing and feedback
+            - ALWAYS use Playwright for all browser testing and feedback
             - Use Playwright to discover what needs adjustment: UI layout, functionality, user experience
             - Let Playwright testing guide your implementation decisions
             - After each code change, immediately test with Playwright browser automation
@@ -226,7 +226,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             You are an expert Node-RED developer with strong UI/UX design knowledge.
-            
+
             ## Step 3: Validate and Document for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
 
             You are completing the final phase on branch: ${{ env.CLAUDE_BRANCH }}
