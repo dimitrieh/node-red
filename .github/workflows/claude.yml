@@ -368,6 +368,9 @@ jobs:
     needs: deploy-screenshots
     runs-on: ubuntu-latest
     if: needs.deploy-screenshots.result == 'success'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       contents: read
       pages: write
