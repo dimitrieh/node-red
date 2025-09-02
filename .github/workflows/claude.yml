@@ -98,13 +98,27 @@ jobs:
                - What files need to be modified  
                - What the expected visual changes will be (numbered list)
                - Step-by-step implementation approach
-            4. Take initial screenshots of areas that will be modified and save them as before-[number].png
+            4. Navigate to and take initial screenshots of areas that will be modified using playwright and save them as before-[number].png
             ## Environment
             Node-RED is running on http://localhost:1880
             SAVE YOUR COMPLETE PLAN TO plan.md - this will be read by subsequent steps.
             REMINDER: Do NOT implement anything - only analyze and plan."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
+
+      # Ensure Node-RED is running before Step 2
+      - name: Verify Node-RED Status Before Step 2
+        run: |
+          if ! curl -f http://localhost:1880 >/dev/null 2>&1; then
+            echo "Node-RED not responding, rebuilding and restarting..."
+            npm run build
+            npm start &
+            echo $! > node-red.pid
+            sleep 15
+            curl -f http://localhost:1880 || (echo "Node-RED failed to start" && exit 1)
+          else
+            echo "Node-RED is running properly"
+          fi
 
       # Step 2: Implementation based on saved plan
       - name: Step 2 - Implement and Test Changes
@@ -117,6 +131,10 @@ jobs:
 
             You are continuing the work from Step 1 on branch: ${{ env.CLAUDE_BRANCH }}
 
+            ## Context from Step 1:
+            - Implementation plan is saved in plan.md - READ THIS FIRST
+            - Node-RED server should be running on http://localhost:1880 (verify with curl)
+
             You are working on the implementation phase with iterative testing and refinement. Follow this process:
 
             ## Implementation Loop Process
@@ -126,7 +144,7 @@ jobs:
             4. For backend/core changes: restart Node-RED if needed using:
                kill $(cat node-red.pid) && npm start & && echo $! > node-red.pid && sleep 10
             5. **Test with Playwright and analyze results**
-            6. **If testing reveals issues or improvements needed, make additional changes**
+            6. **If testing reveals issues or improvements needed: analyse and make additional changes**
             7. **Repeat steps 3-6 until the implementation meets requirements**
             8. Only consider complete when Playwright testing confirms all functionality works correctly
 
@@ -162,6 +180,20 @@ jobs:
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Read,Write,Edit,MultiEdit,Bash
 
+      # Ensure Node-RED is running before Step 3
+      - name: Verify Node-RED Status Before Step 3
+        run: |
+          if ! curl -f http://localhost:1880 >/dev/null 2>&1; then
+            echo "Node-RED not responding, rebuilding and restarting..."
+            npm run build
+            npm start &
+            echo $! > node-red.pid
+            sleep 15
+            curl -f http://localhost:1880 || (echo "Node-RED failed to start" && exit 1)
+          else
+            echo "Node-RED is running properly"
+          fi
+
       - name: Extract Issue Information and Detect Branch
         id: detect-branch
         run: |
@@ -186,11 +218,17 @@ jobs:
 
             You are completing the final phase on branch: ${{ env.CLAUDE_BRANCH }}
 
+            ## Context from Step 2:
+            - Check what was implemented: git diff HEAD~1 --name-only
+            - Verify Node-RED server is running: curl -f http://localhost:1880 || restart server
+            - Match before screenshots: take after-N.png for each before-N.png found
+            - If server down: npm start & && echo $! > node-red.pid && sleep 15
+
             You are in the final validation and documentation phase. Complete these steps:
 
             1. READ the plan from plan.md to understand what was supposed to be implemented
             2. Understand changes made for plan
-            3. Take final screenshots as after-[number].png matching any before screenshots from Step 1
+            3. Find the screenshots with naming convention before-[number].png and take final counterpart screenshots as after-[number].png matching any before screenshots from Step 1
 
             ## Playwright Usage
             - Take after-[number].png screenshots using Playwright's screenshot capability
