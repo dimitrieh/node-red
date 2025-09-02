@@ -142,8 +142,8 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: |
-            --system-prompt "You are an expert Node-RED developer with strong UI/UX design knowledge.
+          prompt:
+            "You are an expert Node-RED developer with strong UI/UX design knowledge.
             ## CRITICAL INSTRUCTION: IMPLEMENT CHANGES THROUGH ITERATIVELY TESTING CHANGES AND REFINING BASED ON PLAYWRIGHT FEEDBACK
             You are continuing the work from Step 1 by implementing changes for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
             ## Context from Step 1:
@@ -156,7 +156,7 @@ jobs:
             2. Make SMALL incremental changes (not the entire implementation at once)
             3. For frontend changes: run npm run build to rebuild assets
             4. For backend/core changes: restart Node-RED if needed using:
-               kill $(cat node-red.pid) && npm start & && echo $! > node-red.pid && sleep 10
+            kill $(cat node-red.pid) && npm start & && echo $! > node-red.pid && sleep 10
             5. **MANDATORY: Navigate to http://localhost:1880 and test with Playwright**
             6. **MANDATORY: Take screenshot and analyze what you see vs what was expected**
             7. **If testing reveals issues: make additional changes and repeat from step 3**
@@ -182,7 +182,7 @@ jobs:
             - If you complete Step 2 without using Playwright extensively, you have FAILED
             ## Implementation Guidelines
             - Apply UI/UX best practices based on what Playwright testing reveals: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing. Adherence to existing design patterns takes priority unless requested differently. Do not extend scope unnecessarily.
-            - Maintain consistency with existing interface patterns  
+            - Maintain consistency with existing interface patterns
             - Focus on what the plan specifies, but improve based on testing feedback
             - Don't stop at good enough - iterate until Playwright confirms functional and visual excellence
             ## Environment
@@ -190,6 +190,7 @@ jobs:
             - You are working on branch: ${{ env.CLAUDE_BRANCH }}
             - The plan file contains your starting strategy - use it with Playwright feedback
             Begin iterative implementation now."
+          claude_args: |
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Read,Write,Edit,MultiEdit,Bash
 
@@ -420,7 +421,7 @@ jobs:
             const readFile = promisify(fs.readFile);
             const writeFile = promisify(fs.writeFile);
             const stat = promisify(fs.stat);
-            
+
             // Find all metadata.json files in ISSUE_ID/COMMIT_HASH/ structure
             async function findMetadataFiles() {
               const metadataFiles = [];
@@ -460,11 +461,11 @@ jobs:
               
               return metadataFiles;
             }
-            
+
             // Process each metadata file
             const metadataFiles = await findMetadataFiles();
             console.log(`Found ${metadataFiles.length} metadata files to process`);
-            
+
             for (const metadataPath of metadataFiles) {
               console.log(`Processing: ${metadataPath}`);
               
