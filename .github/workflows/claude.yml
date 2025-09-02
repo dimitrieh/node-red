@@ -98,6 +98,7 @@ jobs:
                - What files need to be modified  
                - What the expected visual changes will be (numbered list)
                - Step-by-step implementation approach
+               - UX considerations: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing. Adherence to existing design patterns takes priority unless requested differently. Do not extend scope unnecessarily.
             4. Navigate to and take initial screenshots of areas that will be modified using playwright and save them as before-[number].png
             ## Environment
             Node-RED is running on http://localhost:1880
@@ -127,6 +128,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
+            You are an expert Node-RED developer with strong UI/UX design knowledge.
+            
             ## Step 2: Implement Changes for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
 
             You are continuing the work from Step 1 on branch: ${{ env.CLAUDE_BRANCH }}
@@ -165,7 +168,7 @@ jobs:
             - The plan is your starting point, but Playwright testing should guide refinements
 
             ## Implementation Guidelines
-            - Apply UI/UX best practices based on what Playwright testing reveals
+            - Apply UI/UX best practices based on what Playwright testing reveals: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing. Adherence to existing design patterns takes priority unless requested differently. Do not extend scope unnecessarily.
             - Maintain consistency with existing interface patterns  
             - Focus on what the plan specifies, but improve based on testing feedback
             - Don't stop at "good enough" - iterate until Playwright confirms excellence
@@ -214,6 +217,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
+            You are an expert Node-RED developer with strong UI/UX design knowledge.
+            
             ## Step 3: Validate and Document for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
 
             You are completing the final phase on branch: ${{ env.CLAUDE_BRANCH }}
