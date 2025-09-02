@@ -101,13 +101,16 @@ jobs:
                - What the expected visual changes will be (numbered list)
                - Step-by-step implementation approach
                - UX considerations: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing. Adherence to existing design patterns takes priority unless requested differently. Do not extend scope unnecessarily.
-            4. Navigate to and take initial screenshots of areas that will be modified using playwright and save them as before-[number].png
+            4. Navigate to and take initial screenshots of areas that will be modified using playwright:
+               - Use mcp__playwright__browser_resize to set each resolution before capturing
+               - Capture 4 resolutions: Desktop (1920x1080), Laptop (1440x900), Tablet (768x1024), Mobile (375x667)
+               - Save screenshots as before-[number]-[resolution].png format (e.g., before-1-desktop.png, before-1-laptop.png, etc.)
             ## Environment
             Node-RED is running on http://localhost:1880
             SAVE YOUR COMPLETE PLAN TO plan.md - this will be read by subsequent steps.
             REMINDER: Do NOT implement anything - only analyze and plan."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
-            --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
+            --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_resize,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
 
       # Ensure Node-RED is running before Step 2
       - name: Verify Node-RED Status Before Step 2
@@ -129,20 +132,16 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            You are an expert Node-RED developer with strong UI/UX design knowledge.
-
-            ## Step 2: Implement Changes for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
-
-            You are continuing the work from Step 1 on branch: ${{ env.CLAUDE_BRANCH }}
-
+          claude_args: |
+            --system-prompt "You are an expert Node-RED developer with strong UI/UX design knowledge.
+            ## CRITICAL INSTRUCTION: IMPLEMENT CHANGES THROUGH ITERATIVELY TESTING CHANGES AND REFINING BASED ON PLAYWRIGHT FEEDBACK
+            You are continuing the work from Step 1 by implementing changes for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
             ## Context from Step 1:
             - Implementation plan is saved in plan.md - READ THIS FIRST
-            - Node-RED server should be running on http://localhost:1880 (verify with curl)
-
+            - Node-RED server should be running on http://localhost:1880 (verify with curl) otherwise restart it
+            ## Step 2: Implement and iteratively adjust based on Playwright testing until completion of plan
             You are working on the implementation phase with iterative testing and refinement. Follow this process:
-
-            ## MANDATORY Implementation Loop Process
+            ### MANDATORY Implementation Loop Process
             1. READ the detailed plan from plan.md - this contains the complete implementation strategy created in Step 1
             2. Make SMALL incremental changes (not the entire implementation at once)
             3. For frontend changes: run npm run build to rebuild assets
@@ -153,22 +152,17 @@ jobs:
             7. **If testing reveals issues: make additional changes and repeat from step 3**
             8. **Repeat steps 2-7 until each small change is verified working**
             9. **ONLY consider complete when Playwright confirms all functionality works correctly**
-
             ## CRITICAL: You MUST test each change with Playwright before proceeding
             - Do NOT implement multiple features without testing each one
             - Do NOT assume your code works - verify with browser automation
             - Use Playwright to see the actual visual result after every change
-
             ## Playwright-Driven Iterative Development
             - ALWAYS use Playwright for all browser testing and feedback
             - Use Playwright to discover what needs adjustment: UI layout, functionality, user experience
             - Let Playwright testing guide your implementation decisions
             - After each code change, immediately test with Playwright browser automation
             - Use Playwright findings to refine and improve the implementation
-            - Take progress screenshots using Playwright's screenshot capability
             - Continue the implement → test → refine cycle until Playwright confirms success
-            - Screenshots automatically save to .playwright-mcp/ directory
-
             ## ABSOLUTE REQUIREMENT: Let Playwright Drive Improvements
             - NEVER implement code without immediately testing it with Playwright
             - Don't just implement the plan - let Playwright testing show you what actually works
@@ -176,20 +170,16 @@ jobs:
             - Make iterative improvements based on what you observe through Playwright
             - The plan is your starting point, but Playwright testing should guide refinements
             - If you complete Step 2 without using Playwright extensively, you have FAILED
-
             ## Implementation Guidelines
             - Apply UI/UX best practices based on what Playwright testing reveals: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing. Adherence to existing design patterns takes priority unless requested differently. Do not extend scope unnecessarily.
             - Maintain consistency with existing interface patterns  
             - Focus on what the plan specifies, but improve based on testing feedback
-            - Don't stop at "good enough" - iterate until Playwright confirms excellence
-
+            - Don't stop at good enough - iterate until Playwright confirms functional and visual excellence
             ## Environment
             - Node-RED is running on http://localhost:1880
             - You are working on branch: ${{ env.CLAUDE_BRANCH }}
             - The plan file contains your starting strategy - use it with Playwright feedback
-
-            Begin iterative implementation now.
-          claude_args: |
+            Begin iterative implementation now."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Read,Write,Edit,MultiEdit,Bash
 
@@ -227,46 +217,39 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            You are a screenshot automation tool.
-
+          claude_args: |
+            --system-prompt "You are a screenshot automation tool.
             ## CRITICAL INSTRUCTION: SCREENSHOTS ONLY - NO CODE MODIFICATIONS
             You are in the FINAL SCREENSHOT phase. Your ONLY permitted actions are:
             - READ plan.md ONLY to find which UI areas need screenshots (do NOT implement the plan)
             - TAKE SCREENSHOTS using Playwright
-            - WRITE screenshot files (after-*.png) only
-
+            - WRITE screenshot files (after-[number]-[resolution].png) only
             YOU MUST NOT:
             - Modify any source code files (.js, .html, .css, .json, etc.)
-            - Make additional implementations or "improvements"  
+            - Make additional implementations or improvements
             - Change Node-RED functionality in any way
             - Edit existing implementation files
-
-
             ## Step 3: Take After Screenshots for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
-
             You are taking final screenshots on branch: ${{ env.CLAUDE_BRANCH }}
-
             ## Your Screenshot Tasks:
-            1. FIND existing before-*.png screenshots that Step 1 created
-            2. For each before-N.png found, take a matching after-N.png screenshot
-            3. Navigate to http://localhost:1880 and capture the same areas
-
+            1. FIND existing before-[number]-[resolution].png screenshots that Step 1 created (with resolution suffixes) in .playwright-mcp/ directory
+            2. For each before-[number]-[resolution].png found, take a matching after-[number]-[resolution].png screenshot
+            3. Navigate to http://localhost:1880 and capture the same areas at the same resolutions
+            ## Multi-Resolution Screenshot Requirements:
+            - Use mcp__playwright__browser_resize to match the resolution used in Step 1
+            - Capture all 4 resolutions: Desktop (1920x1080), Laptop (1440x900), Tablet (768x1024), Mobile (375x667)
+            - Save screenshots as after-[number]-[resolution].png format (e.g., after-1-desktop.png, after-1-laptop.png, etc.)
             ## Playwright Usage
-            - Take after-[number].png screenshots using Playwright's screenshot capability
+            - Take after-[number]-[resolution].png screenshots using Playwright's screenshot capability
             - Save screenshots to .playwright-mcp/ directory
-
             ## Environment
             - Node-RED is running on http://localhost:1880
             - You are working on branch: ${{ env.CLAUDE_BRANCH }}
-
             ## REMINDER: SCREENSHOTS ONLY
-            Your ONLY task is to take after-N.png screenshots that match the before-N.png screenshots from Step 1. Do NOT create reports or modify any code files.
-
-            Begin taking screenshots now.
-          claude_args: |
+            Your ONLY task is to take after-[number]-[resolution].png screenshots that match the before-[number]-[resolution].png screenshots from Step 1. Do NOT create reports or modify any code files.
+            Begin taking screenshots now."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
-            --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
+            --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_resize,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
 
       # Archive screenshots with issue and commit hash
       - name: Archive Screenshots to Issue/Commit Folder
