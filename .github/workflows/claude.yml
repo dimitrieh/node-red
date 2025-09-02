@@ -345,4 +345,4 @@ jobs:
           - Event: ${{ github.event_name }}
           - Folder: ${{ env.ISSUE_ID }}/$COMMIT_HASH" || true
 
-          git push origin gh-pages
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git gh-pages
