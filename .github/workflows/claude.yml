@@ -238,38 +238,53 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
-            --system-prompt "You are a screenshot automation tool.
+            --system-prompt "You are a screenshot automation tool for Step 3.
             ## CRITICAL INSTRUCTION: SCREENSHOTS ONLY - NO CODE MODIFICATIONS
             You are in the FINAL SCREENSHOT phase. Your ONLY permitted actions are:
-            - READ plan.md ONLY to find which UI areas need screenshots (do NOT implement the plan)
-            - TAKE SCREENSHOTS using Playwright
-            - WRITE screenshot files (after-[number]-[resolution].png) only
+            - TAKE SCREENSHOTS using Playwright (mcp__playwright__browser_take_screenshot)
+            - SAVE screenshots to .playwright-mcp/ directory with exact filenames
+            - Navigate and resize browser as needed
             YOU MUST NOT:
+            - Read or verify screenshot files after taking them
             - Modify any source code files (.js, .html, .css, .json, etc.)
             - Make additional implementations or improvements
             - Change Node-RED functionality in any way
             - Edit existing implementation files
+            
             ## Step 3: Take After Screenshots for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
             You are taking final screenshots on branch: ${{ env.CLAUDE_BRANCH }}
-            ## Your Screenshot Tasks:
-            1. FIND existing before-[number]-[resolution].png screenshots that Step 1 created (with resolution suffixes) in .playwright-mcp/ directory
-            2. For each before-[number]-[resolution].png found, take a matching after-[number]-[resolution].png screenshot
-            3. Navigate to http://localhost:1880 and capture the same areas at the same resolutions
-            ## Multi-Resolution Screenshot Requirements:
-            - Use mcp__playwright__browser_resize to match the resolution used in Step 1
-            - Capture all 4 resolutions with these exact filenames:
-              * Desktop (1920x1080) → after-1-desktop.png, after-2-desktop.png, etc.
-              * Laptop (1440x900) → after-1-laptop.png, after-2-laptop.png, etc.
-              * Tablet (768x1024) → after-1-tablet.png, after-2-tablet.png, etc.
-              * Mobile (375x667) → after-1-mobile.png, after-2-mobile.png, etc.
-            ## Playwright Usage
-            - Take after-[number]-[resolution].png screenshots using Playwright's screenshot capability
+            
+            ## Your Screenshot Tasks (Mirror Step 1 approach):
+            1. Navigate to http://localhost:1880 using mcp__playwright__browser_navigate
+            2. Identify which UI areas were modified by checking existing before-*.png files in .playwright-mcp/
+            3. For EACH area that has before screenshots, take matching after screenshots:
+               - Use mcp__playwright__browser_resize to set each resolution before capturing
+               - Capture 4 resolutions for EACH area with these exact filenames:
+                 * Desktop (1920x1080) → after-1-desktop.png, after-2-desktop.png, etc.
+                 * Laptop (1440x900) → after-1-laptop.png, after-2-laptop.png, etc. 
+                 * Tablet (768x1024) → after-1-tablet.png, after-2-tablet.png, etc.
+                 * Mobile (375x667) → after-1-mobile.png, after-2-mobile.png, etc.
+               - Navigate to different UI states/views as needed to capture the same areas as Step 1
+            
+            ## Critical Requirements:
+            - Use mcp__playwright__browser_resize BEFORE each screenshot
+            - Use mcp__playwright__browser_take_screenshot with filename parameter
+            - Save ALL screenshots to .playwright-mcp/ directory
+            - Do NOT try to read/verify screenshot files - just take them and move on
+            - Complete ALL 4 resolutions for each area before moving to next area
+            - If a screenshot fails, continue with the next one
+            
             ## Environment
-            - Node-RED is running on http://localhost:1880
+            - Node-RED is running on http://localhost:1880 (verified)
             - You are working on branch: ${{ env.CLAUDE_BRANCH }}
-            ## REMINDER: SCREENSHOTS ONLY
-            Your ONLY task is to take after-[number]-[resolution].png screenshots that match the before-[number]-[resolution].png screenshots from Step 1. Do NOT create reports or modify any code files.
-            Begin taking screenshots now."
+            - Screenshots will be automatically archived after this step
+            
+            ## Error Handling
+            - If Node-RED is not accessible, report the issue but don't fail
+            - If a screenshot fails, log it but continue with remaining screenshots
+            - Focus on completing as many screenshots as possible
+            
+            Begin taking after screenshots now. Do NOT read files - just take screenshots."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
             --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_resize,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
 
@@ -284,14 +299,31 @@ jobs:
           # Create directory with issue/commit structure
           mkdir -p "$SCREENSHOT_DIR"
 
+          # Debug: List all files in .playwright-mcp directory
+          echo "📁 Contents of .playwright-mcp directory:"
+          if [ -d ".playwright-mcp" ]; then
+            ls -la .playwright-mcp/ || echo "Directory exists but ls failed"
+          else
+            echo "❌ .playwright-mcp directory does not exist"
+          fi
+          
           # Copy only before-*.png and after-*.png screenshots to commit folder
           if [ -d ".playwright-mcp" ]; then
+            echo "📸 Copying screenshot files to $SCREENSHOT_DIR/"
             # Use bash arrays to safely handle files that may or may not exist
             shopt -s nullglob  # Make glob patterns expand to nothing if no matches
+            COPIED_COUNT=0
             for file in .playwright-mcp/before-*.png .playwright-mcp/after-*.png; do
-              [ -f "$file" ] && cp "$file" "$SCREENSHOT_DIR/"
+              if [ -f "$file" ]; then
+                echo "  ✅ Copying: $file ($(stat -f%z "$file" 2>/dev/null || echo "unknown size") bytes)"
+                cp "$file" "$SCREENSHOT_DIR/"
+                ((COPIED_COUNT++))
+              fi
             done
             shopt -u nullglob  # Reset nullglob
+            echo "📊 Total files copied: $COPIED_COUNT"
+          else
+            echo "❌ .playwright-mcp directory not found, no screenshots to copy"
           fi
 
           # Create metadata file for GitHub Pages workflow
