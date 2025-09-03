@@ -355,7 +355,7 @@ jobs:
 
           # Copy screenshots with run ID structure (no restructuring needed)
           if [ -d "../node-red/screenshots" ]; then
-            cp -r ../node-red/screenshots/* . 2>/dev/null || true
+            cp -r ../node-red/screenshots/. . 2>/dev/null || true
             
             # Check if there are any changes to commit
             if [ -n "$(git status --porcelain)" ]; then
