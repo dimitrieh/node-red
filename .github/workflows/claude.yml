@@ -72,9 +72,20 @@ jobs:
         run: |
           npm start &
           echo $! > node-red.pid
-          # Wait for Node-RED to start
-          sleep 10
-          curl -f http://localhost:1880 || (echo "Node-RED failed to start" && exit 1)
+          # Enhanced wait for Node-RED to fully initialize
+          echo "⏳ Waiting for Node-RED to start..."
+          for i in {1..30}; do
+            if curl -f http://localhost:1880 >/dev/null 2>&1; then
+              # Also check if UI assets are loaded
+              if curl -f http://localhost:1880/red/red.min.js >/dev/null 2>&1; then
+                echo "✅ Node-RED fully initialized (attempt $i)"
+                break
+              fi
+            fi
+            echo "Waiting... attempt $i/30"
+            sleep 2
+          done
+          curl -f http://localhost:1880 || (echo "❌ Node-RED failed to start after 60 seconds" && exit 1)
 
       - name: Ensure Playwright MCP directory exists
         run: mkdir -p .playwright-mcp
