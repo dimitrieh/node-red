@@ -58,6 +58,89 @@ jobs:
         with:
           node-version: "18"
 
+      - name: Generate .claude directory structure
+        run: |
+          # Create .claude directory structure
+          mkdir -p .claude/hooks
+          
+          # Generate .claude/settings.local.json
+          cat > .claude/settings.local.json << 'EOF'
+          {
+            "hooks": {
+              "PreToolUse": [
+                {
+                  "matcher": "mcp__playwright__browser_take_screenshot",
+                  "hooks": [
+                    {
+                      "type": "command",
+                      "command": ".claude/hooks/screenshot-naming-enforcer.sh"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+          EOF
+          
+          # Generate .claude/hooks/screenshot-naming-enforcer.sh
+          cat > .claude/hooks/screenshot-naming-enforcer.sh << 'EOF'
+          #!/bin/bash
+          # Minimal screenshot naming enforcer for Node-RED workflow
+          # Patterns: before-[NUMBER]-[RESOLUTION].png, after-[NUMBER]-[RESOLUTION].png
+          
+          # Read JSON input and extract parameters
+          INPUT=$(cat)
+          FILENAME=$(echo "$INPUT" | jq -r '.tool_input.filename // ""')
+          TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""')
+          
+          # Only process screenshot tool calls
+          [[ "$TOOL_NAME" != "mcp__playwright__browser_take_screenshot" ]] && exit 0
+          
+          # Detect workflow step
+          detect_step() {
+              [[ -n "$CLAUDE_WORKFLOW_STEP" ]] && echo "$CLAUDE_WORKFLOW_STEP" && return
+              [[ -f "CLAUDE.md" ]] && echo "2" && return
+              ls .playwright-mcp/before-*.png >/dev/null 2>&1 && echo "3" || echo "1"
+          }
+          
+          CURRENT_STEP=$(detect_step)
+          
+          # Step 2 bypass: Allow any screenshot names during implementation
+          [[ "$CURRENT_STEP" == "2" ]] && exit 0
+          
+          # Validate filename exists
+          if [[ -z "$FILENAME" ]]; then
+              echo "❌ STEP $CURRENT_STEP: No filename specified" >&2
+              [[ "$CURRENT_STEP" == "1" ]] && echo "Required: before-[NUMBER]-[RESOLUTION].png" >&2
+              [[ "$CURRENT_STEP" == "3" ]] && echo "Required: after-[NUMBER]-[RESOLUTION].png" >&2
+              echo "Valid resolutions: desktop, laptop, tablet, mobile" >&2
+              exit 1
+          fi
+          
+          # Validate pattern with single regex
+          BASE=$(basename "$FILENAME")
+          EXPECTED_PREFIX=$([[ "$CURRENT_STEP" == "1" ]] && echo "before" || echo "after")
+          PATTERN="^${EXPECTED_PREFIX}-[0-9]+-(desktop|laptop|tablet|mobile)\.png$"
+          
+          if [[ ! "$BASE" =~ $PATTERN ]]; then
+              echo "❌ STEP $CURRENT_STEP: Invalid pattern '$BASE'" >&2
+              echo "Required: ${EXPECTED_PREFIX}-[NUMBER]-[RESOLUTION].png" >&2
+              echo "Valid resolutions: desktop, laptop, tablet, mobile" >&2
+              exit 1
+          fi
+          
+          exit 0
+          EOF
+          
+          # Make the hook script executable
+          chmod +x .claude/hooks/screenshot-naming-enforcer.sh
+          
+          # Verify the structure was created
+          echo "📁 Generated .claude directory structure:"
+          ls -la .claude/
+          ls -la .claude/hooks/
+          echo "✅ .claude directory ready for workflow"
+
       - name: Install dependencies
         run: npm install
 
@@ -91,27 +174,28 @@ jobs:
           claude_args: |
             --system-prompt "You are an expert Node-RED developer with strong UI/UX design knowledge.
             ## CRITICAL INSTRUCTION: ANALYSIS ONLY - NO CHANGES
-            Your ONLY task is to understand the request and create a detailed plan. You MUST NOT make any code changes, file modifications, or implementations in this step.
-            ## Step 1: Understand and Create Plan
+            Your ONLY task is to understand the request and create a detailed plan. You MUST NOT make any code changes, file modifications, or implementations in this session.
+            ## Understand and Create Plan
             1. Read the GitHub issue/comment that triggered this workflow
             2. Explore the Node-RED codebase to understand current implementation
             3. Create a specific implementation plan and SAVE IT TO plan.md:
                - Which specific UI areas/components will be affected
                - What files need to be modified  
-               - What the expected visual changes will be (numbered list)
+               - What the expected visual changes will be
                - Step-by-step implementation approach
                - UX considerations: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing. Adherence to existing design patterns takes priority unless requested differently. Do not extend scope unnecessarily.
-            4. Navigate to and take comprehensive initial screenshots of ALL areas that will be modified using playwright:
+            4. Navigate Node-RED and take comprehensive initial screenshots of ALL areas that will be modified using playwright:
+               - Node-RED server should be running on http://localhost:1880 (verify with curl) otherwise restart it
                - Identify all distinct UI areas/components that will be affected by the requested changes
                - For EACH identified area, capture screenshots using this numbering system:
                  * Area 1: Main editor/workspace - before-1-[resolution].png  
                  * Area 2: Node palette - before-2-[resolution].png
                  * Area 3: Sidebar - before-3-[resolution].png
-                 * Continue numbering for additional areas (before-4-, before-5-, etc.)
+                 * Continue numbering for additional areas (before-4-[resolution].png, before-5-[resolution].png, etc.)
                - CRITICAL: Use EXACT filenames - NO other naming patterns will work
                - Use mcp__playwright__browser_resize to set each resolution before capturing
                - Use mcp__playwright__browser_take_screenshot with filename parameter
-               - Capture 4 resolutions for EACH area with these EXACT filenames:
+               - For each identified area capture 4 resolutions following the same naming conventions as before:
                  * Desktop (1920x1080) → before-1-desktop.png, before-2-desktop.png, etc.
                  * Laptop (1440x900) → before-1-laptop.png, before-2-laptop.png, etc.
                  * Tablet (768x1024) → before-1-tablet.png, before-2-tablet.png, etc.
@@ -121,8 +205,8 @@ jobs:
                - Navigate to different UI states/views if needed to capture all relevant areas
             ## Environment
             Node-RED is running on http://localhost:1880
-            SAVE YOUR COMPLETE PLAN TO plan.md - this will be read by subsequent steps.
-            REMINDER: Do NOT implement anything - only analyze and plan."
+            SAVE YOUR COMPLETE PLAN TO plan.md - this will be read by subsequent sessions.
+            REMINDER: Do NOT implement anything - only analyze, plan, and take screenshots."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_resize,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
 
@@ -191,14 +275,14 @@ jobs:
           cat > CLAUDE.md << 'EOF'
           You are an expert Node-RED developer with strong UI/UX design knowledge.
           ## CRITICAL INSTRUCTION: IMPLEMENT CHANGES THROUGH ITERATIVELY TESTING CHANGES AND REFINING BASED ON PLAYWRIGHT FEEDBACK
-          You are continuing the work from Step 1 by implementing changes for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
-          ## Context from Step 1:
+          You are continuing the work from a previous session by implementing changes for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
+          ## Context:
           - Implementation plan is saved in plan.md - READ THIS FIRST
           - Node-RED server should be running on http://localhost:1880 (verify with curl) otherwise restart it
-          ## Step 2: Implement and iteratively adjust based on Playwright testing until completion of plan
+          ## Implement and iteratively adjust based on Playwright testing until completion of plan
           You are working on the implementation phase with iterative testing and refinement. Follow this process:
           ### MANDATORY Implementation Loop Process
-          1. READ the detailed plan from plan.md - this contains the complete implementation strategy created in Step 1
+          1. READ the detailed plan from plan.md - this contains the complete implementation strategy that has already been created
           2. Make SMALL incremental changes (not the entire implementation at once)
           3. For frontend changes: run npm run build to rebuild assets
           4. For backend/core changes: restart Node-RED if needed using:
@@ -225,7 +309,7 @@ jobs:
           - Use browser automation to discover edge cases and usability issues
           - Make iterative improvements based on what you observe through Playwright
           - The plan is your starting point, but Playwright testing should guide refinements
-          - If you complete Step 2 without using Playwright extensively, you have FAILED
+          - If you complete this session without using Playwright extensively, you have FAILED
           ## Implementation Guidelines
           - Apply UI/UX best practices based on what Playwright testing reveals: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing. Adherence to existing design patterns takes priority unless requested differently. Do not extend scope unnecessarily.
           - Maintain consistency with existing interface patterns
@@ -303,50 +387,33 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: |
-            --system-prompt "You are a screenshot automation tool for Step 3.
-            ## CRITICAL INSTRUCTION: SCREENSHOTS ONLY - NO CODE MODIFICATIONS
-            You are in the FINAL SCREENSHOT phase. Your ONLY permitted actions are:
-            - TAKE SCREENSHOTS using Playwright (mcp__playwright__browser_take_screenshot)
-            - SAVE screenshots to .playwright-mcp/ directory with exact filenames
-            - Navigate and resize browser as needed
-            YOU MUST NOT:
-            - Modify any source code files (.js, .html, .css, .json, etc.)
-            - Make additional implementations or improvements
-            - Change Node-RED functionality in any way
-            - Edit existing implementation files
-            ## Step 3: Take Screenshots
-            You are taking final screenshots on branch: ${{ env.CLAUDE_BRANCH }}
-            ## Your Screenshot Tasks (Mirror Step 1 approach):
-            1. Identify which UI areas were modified by checking existing before-*.png files in .playwright-mcp/
-            2. Navigate to http://localhost:1880 using mcp__playwright__browser_navigate
-            3. For EACH area that has before screenshots, take matching after screenshots:
-               - CRITICAL: Use EXACT filename pattern - after-[NUMBER]-[RESOLUTION].png
+            --system-prompt "You are an expert Node-RED developer with strong UI/UX design knowledge here to take screenshots of Node-RED which has already been changed.
+            ## CRITICAL INSTRUCTION: SCREENSHOTS ONLY - NO CHANGES
+            Your ONLY task is to understand the changes made to Node-RED by looking at the last commit and the already implemented changes of the implementation plan that is saved in plan.md. You MUST NOT make any code changes, file modifications, or implementations.
+            ## Take Screenshots
+            1. Understand the last commit and the already implemented changes of the implementation plan that is saved in plan.md
+            2. Navigate Node-RED and take comprehensive screenshots of ALL areas that have been modified already using playwright:
+               - Node-RED server should be running on http://localhost:1880 (verify with curl) otherwise restart it
+               - Identify which UI areas were modified by checking the directory for any existing screenshots with the following naming convention: after-*.png 
+               - For EACH identified area, capture screenshots using this numbering system:
+                 * Area 1: Main editor/workspace - after-1-[resolution].png  
+                 * Area 2: Node palette - after-2-[resolution].png
+                 * Area 3: Sidebar - after-3-[resolution].png
+                 * Continue numbering for additional areas (after-4-[resolution].png, after-5-[resolution].png, etc.)
+               - CRITICAL: Use EXACT filenames - NO other naming patterns will work
                - Use mcp__playwright__browser_resize to set each resolution before capturing
                - Use mcp__playwright__browser_take_screenshot with filename parameter
-               - Capture 4 resolutions for EACH area with these EXACT filenames:
+               - For each identified area capture 4 resolutions following the same naming conventions as before:
                  * Desktop (1920x1080) → after-1-desktop.png, after-2-desktop.png, etc.
-                 * Laptop (1440x900) → after-1-laptop.png, after-2-laptop.png, etc. 
+                 * Laptop (1440x900) → after-1-laptop.png, after-2-laptop.png, etc.
                  * Tablet (768x1024) → after-1-tablet.png, after-2-tablet.png, etc.
                  * Mobile (375x667) → after-1-mobile.png, after-2-mobile.png, etc.
-               - Example: If Step 1 created before-1-desktop.png, you MUST create after-1-desktop.png
-               - NO descriptive names like 'dashboard-after.png' - only numbered pattern works
-               - Navigate to different UI states/views as needed to capture the same areas as Step 1
-            ## Critical Requirements:
-            - Use mcp__playwright__browser_resize BEFORE each screenshot
-            - Use mcp__playwright__browser_take_screenshot with filename parameter
-            - Save ALL screenshots to .playwright-mcp/ directory
-            - Do NOT try to read/verify screenshot files - just take them and move on
-            - Complete ALL 4 resolutions for each area before moving to next area
-            - If a screenshot fails, continue with the next one
+               - Example: For Area 1 Main Editor you MUST create exactly these 4 files:
+                 * after-1-desktop.png, after-1-laptop.png, after-1-tablet.png, after-1-mobile.png
+               - Navigate to different UI states/views if needed to capture all relevant areas
             ## Environment
-            - Node-RED is running on http://localhost:1880 (verified)
-            - You are working on branch: ${{ env.CLAUDE_BRANCH }}
-            - Screenshots will be automatically archived after this step
-            ## Error Handling
-            - If Node-RED is not accessible, report the issue but don't fail
-            - If a screenshot fails, log it but continue with remaining screenshots
-            - Focus on completing as many screenshots as possible
-            Begin taking after screenshots now. Do NOT read files - just take screenshots."
+            Node-RED is running on http://localhost:1880
+            REMINDER: Do NOT implement anything - only take screenshots."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
             --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_resize,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
 
