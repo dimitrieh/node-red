@@ -310,18 +310,15 @@ jobs:
             - SAVE screenshots to .playwright-mcp/ directory with exact filenames
             - Navigate and resize browser as needed
             YOU MUST NOT:
-            - Read or verify screenshot files after taking them
             - Modify any source code files (.js, .html, .css, .json, etc.)
             - Make additional implementations or improvements
             - Change Node-RED functionality in any way
             - Edit existing implementation files
-            
-            ## Step 3: Take After Screenshots for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
+            ## Step 3: Take Screenshots
             You are taking final screenshots on branch: ${{ env.CLAUDE_BRANCH }}
-            
             ## Your Screenshot Tasks (Mirror Step 1 approach):
-            1. Navigate to http://localhost:1880 using mcp__playwright__browser_navigate
-            2. Identify which UI areas were modified by checking existing before-*.png files in .playwright-mcp/
+            1. Identify which UI areas were modified by checking existing before-*.png files in .playwright-mcp/
+            2. Navigate to http://localhost:1880 using mcp__playwright__browser_navigate
             3. For EACH area that has before screenshots, take matching after screenshots:
                - CRITICAL: Use EXACT filename pattern - after-[NUMBER]-[RESOLUTION].png
                - Use mcp__playwright__browser_resize to set each resolution before capturing
@@ -334,7 +331,6 @@ jobs:
                - Example: If Step 1 created before-1-desktop.png, you MUST create after-1-desktop.png
                - NO descriptive names like 'dashboard-after.png' - only numbered pattern works
                - Navigate to different UI states/views as needed to capture the same areas as Step 1
-            
             ## Critical Requirements:
             - Use mcp__playwright__browser_resize BEFORE each screenshot
             - Use mcp__playwright__browser_take_screenshot with filename parameter
@@ -342,17 +338,14 @@ jobs:
             - Do NOT try to read/verify screenshot files - just take them and move on
             - Complete ALL 4 resolutions for each area before moving to next area
             - If a screenshot fails, continue with the next one
-            
             ## Environment
             - Node-RED is running on http://localhost:1880 (verified)
             - You are working on branch: ${{ env.CLAUDE_BRANCH }}
             - Screenshots will be automatically archived after this step
-            
             ## Error Handling
             - If Node-RED is not accessible, report the issue but don't fail
             - If a screenshot fails, log it but continue with remaining screenshots
             - Focus on completing as many screenshots as possible
-            
             Begin taking after screenshots now. Do NOT read files - just take screenshots."
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
             --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_resize,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
@@ -411,7 +404,7 @@ jobs:
           else
             echo "❌ .playwright-mcp directory does not exist"
           fi
-          
+
           # Copy screenshots with primary and fallback patterns
           if [ -d ".playwright-mcp" ]; then
             echo "📸 Copying screenshot files to $SCREENSHOT_DIR/"
@@ -427,7 +420,7 @@ jobs:
                 FILE_SIZE=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo "unknown size")
                 echo "  ✅ Copying: $file ($FILE_SIZE bytes)"
                 cp "$file" "$SCREENSHOT_DIR/"
-                ((COPIED_COUNT++))
+                COPIED_COUNT=$((COPIED_COUNT + 1))
               fi
             done
             
@@ -440,7 +433,7 @@ jobs:
                   FILE_SIZE=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo "unknown size")
                   echo "  📄 Fallback copying: $file ($FILE_SIZE bytes)"
                   cp "$file" "$SCREENSHOT_DIR/"
-                  ((COPIED_COUNT++))
+                  COPIED_COUNT=$((COPIED_COUNT + 1))
                 fi
               done
               
@@ -494,7 +487,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: screenshots-${{ needs.claude.outputs.issue-id }}-${{ github.run_id }}
-          path: ./screenshots
+          path: ./screenshots/${{ needs.claude.outputs.issue-id }}
 
       - name: Deploy Screenshots to gh-pages
         id: deploy
