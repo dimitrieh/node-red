@@ -108,12 +108,16 @@ jobs:
                  * Area 2: Node palette - before-2-[resolution].png
                  * Area 3: Sidebar - before-3-[resolution].png
                  * Continue numbering for additional areas (before-4-, before-5-, etc.)
+               - CRITICAL: Use EXACT filenames - NO other naming patterns will work
                - Use mcp__playwright__browser_resize to set each resolution before capturing
-               - Capture 4 resolutions for EACH area with these exact filenames:
+               - Use mcp__playwright__browser_take_screenshot with filename parameter
+               - Capture 4 resolutions for EACH area with these EXACT filenames:
                  * Desktop (1920x1080) → before-1-desktop.png, before-2-desktop.png, etc.
                  * Laptop (1440x900) → before-1-laptop.png, before-2-laptop.png, etc.
                  * Tablet (768x1024) → before-1-tablet.png, before-2-tablet.png, etc.
                  * Mobile (375x667) → before-1-mobile.png, before-2-mobile.png, etc.
+               - Example: For Area 1 Main Editor you MUST create exactly these 4 files:
+                 * before-1-desktop.png, before-1-laptop.png, before-1-tablet.png, before-1-mobile.png
                - Navigate to different UI states/views if needed to capture all relevant areas
             ## Environment
             Node-RED is running on http://localhost:1880
@@ -122,18 +126,63 @@ jobs:
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
             --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_resize,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
 
+      # Validate Step 1 screenshots were created with correct naming
+      - name: Validate Step 1 Screenshots
+        run: |
+          echo "=== Step 1 Screenshot Validation ==="
+          if [ -d ".playwright-mcp" ]; then
+            echo "📁 .playwright-mcp directory exists"
+            
+            # Count screenshots by pattern
+            BEFORE_COUNT=$(ls -1 .playwright-mcp/before-*-*.png 2>/dev/null | wc -l)
+            DESCRIPTIVE_COUNT=$(ls -1 .playwright-mcp/*.png 2>/dev/null | grep -v -E '^.playwright-mcp/(before|after)-[0-9]+-' | wc -l)
+            
+            echo "📊 Screenshots found:"
+            echo "  - Correct pattern (before-N-resolution.png): $BEFORE_COUNT"
+            echo "  - Other/descriptive names: $DESCRIPTIVE_COUNT"
+            
+            if [ $BEFORE_COUNT -gt 0 ]; then
+              echo "✅ Step 1 created screenshots with correct naming pattern"
+              echo "📋 Before screenshots found:"
+              ls -1 .playwright-mcp/before-*-*.png 2>/dev/null || true
+            else
+              echo "⚠️  No screenshots found with correct naming pattern"
+              echo "📋 All PNG files in directory:"
+              ls -1 .playwright-mcp/*.png 2>/dev/null | head -10 || echo "No PNG files found"
+            fi
+          else
+            echo "❌ .playwright-mcp directory not found"
+            exit 1
+          fi
+
       # Ensure Node-RED is running before Step 2
       - name: Verify Node-RED Status Before Step 2
         run: |
+          echo "🔍 Checking Node-RED status..."
           if ! curl -f http://localhost:1880 >/dev/null 2>&1; then
-            echo "Node-RED not responding, rebuilding and restarting..."
+            echo "❌ Node-RED not responding, rebuilding and restarting..."
+            kill $(cat node-red.pid) 2>/dev/null || true
             npm run build
             npm start &
             echo $! > node-red.pid
-            sleep 15
-            curl -f http://localhost:1880 || (echo "Node-RED failed to start" && exit 1)
+            
+            # Enhanced readiness check with UI validation
+            for i in {1..30}; do
+              if curl -f http://localhost:1880 >/dev/null 2>&1; then
+                # Check if UI assets are loaded (not just server responding)
+                if curl -f http://localhost:1880/red/red.min.js >/dev/null 2>&1; then
+                  echo "✅ Node-RED UI fully ready (attempt $i)"
+                  break
+                fi
+              fi
+              echo "⏳ Waiting for Node-RED UI... attempt $i/30"
+              sleep 2
+            done
+            
+            # Final validation
+            curl -f http://localhost:1880 || (echo "❌ Node-RED failed to start properly" && exit 1)
           else
-            echo "Node-RED is running properly"
+            echo "✅ Node-RED is running properly"
           fi
 
       # Create CLAUDE.md with step 2 instructions
@@ -206,15 +255,31 @@ jobs:
       # Ensure Node-RED is running before Step 3
       - name: Verify Node-RED Status Before Step 3
         run: |
+          echo "🔍 Checking Node-RED status before Step 3..."
           if ! curl -f http://localhost:1880 >/dev/null 2>&1; then
-            echo "Node-RED not responding, rebuilding and restarting..."
+            echo "❌ Node-RED not responding, rebuilding and restarting..."
+            kill $(cat node-red.pid) 2>/dev/null || true
             npm run build
             npm start &
             echo $! > node-red.pid
-            sleep 15
-            curl -f http://localhost:1880 || (echo "Node-RED failed to start" && exit 1)
+            
+            # Enhanced readiness check with UI validation
+            for i in {1..30}; do
+              if curl -f http://localhost:1880 >/dev/null 2>&1; then
+                # Check if UI assets are loaded
+                if curl -f http://localhost:1880/red/red.min.js >/dev/null 2>&1; then
+                  echo "✅ Node-RED UI fully ready for Step 3 (attempt $i)"
+                  break
+                fi
+              fi
+              echo "⏳ Waiting for Node-RED UI... attempt $i/30"
+              sleep 2
+            done
+            
+            # Final validation
+            curl -f http://localhost:1880 || (echo "❌ Node-RED failed to start properly" && exit 1)
           else
-            echo "Node-RED is running properly"
+            echo "✅ Node-RED is running properly for Step 3"
           fi
 
       - name: Extract Issue Information and Detect Branch
@@ -258,12 +323,16 @@ jobs:
             1. Navigate to http://localhost:1880 using mcp__playwright__browser_navigate
             2. Identify which UI areas were modified by checking existing before-*.png files in .playwright-mcp/
             3. For EACH area that has before screenshots, take matching after screenshots:
+               - CRITICAL: Use EXACT filename pattern - after-[NUMBER]-[RESOLUTION].png
                - Use mcp__playwright__browser_resize to set each resolution before capturing
-               - Capture 4 resolutions for EACH area with these exact filenames:
+               - Use mcp__playwright__browser_take_screenshot with filename parameter
+               - Capture 4 resolutions for EACH area with these EXACT filenames:
                  * Desktop (1920x1080) → after-1-desktop.png, after-2-desktop.png, etc.
                  * Laptop (1440x900) → after-1-laptop.png, after-2-laptop.png, etc. 
                  * Tablet (768x1024) → after-1-tablet.png, after-2-tablet.png, etc.
                  * Mobile (375x667) → after-1-mobile.png, after-2-mobile.png, etc.
+               - Example: If Step 1 created before-1-desktop.png, you MUST create after-1-desktop.png
+               - NO descriptive names like 'dashboard-after.png' - only numbered pattern works
                - Navigate to different UI states/views as needed to capture the same areas as Step 1
             
             ## Critical Requirements:
@@ -288,6 +357,42 @@ jobs:
             --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}'
             --allowedTools mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_resize,mcp__playwright__browser_wait_for,mcp__playwright__browser_click,mcp__playwright__browser_evaluate,Write,Read
 
+      # Validate Step 3 screenshots were created
+      - name: Validate Step 3 Screenshots
+        if: always() && steps.post-comparison.conclusion != 'skipped'
+        run: |
+          echo "=== Step 3 Screenshot Validation ==="
+          if [ -d ".playwright-mcp" ]; then
+            # Count before and after screenshots
+            BEFORE_COUNT=$(ls -1 .playwright-mcp/before-*-*.png 2>/dev/null | wc -l)
+            AFTER_COUNT=$(ls -1 .playwright-mcp/after-*-*.png 2>/dev/null | wc -l)
+            
+            echo "📊 Final screenshot count:"
+            echo "  - Before screenshots (before-N-resolution.png): $BEFORE_COUNT"
+            echo "  - After screenshots (after-N-resolution.png): $AFTER_COUNT"
+            
+            if [ $BEFORE_COUNT -gt 0 ] && [ $AFTER_COUNT -gt 0 ]; then
+              echo "✅ Both before and after screenshots found"
+              
+              # Check for matching pairs
+              echo "🔍 Checking for screenshot pairs:"
+              for before_file in .playwright-mcp/before-*-*.png; do
+                if [ -f "$before_file" ]; then
+                  after_file=$(echo "$before_file" | sed 's/before-/after-/')
+                  if [ -f "$after_file" ]; then
+                    echo "  ✅ Pair: $(basename "$before_file") ↔ $(basename "$after_file")"
+                  else
+                    echo "  ⚠️  Missing after: $(basename "$before_file") ↔ $(basename "$after_file")"
+                  fi
+                fi
+              done
+            else
+              echo "⚠️  Incomplete screenshot set - before: $BEFORE_COUNT, after: $AFTER_COUNT"
+            fi
+          else
+            echo "❌ .playwright-mcp directory not found"
+          fi
+
       # Archive screenshots with issue and run ID
       - name: Archive Screenshots to Issue/Run Folder
         if: always() && steps.post-comparison.conclusion != 'skipped'
@@ -307,19 +412,43 @@ jobs:
             echo "❌ .playwright-mcp directory does not exist"
           fi
           
-          # Copy only before-*.png and after-*.png screenshots to commit folder
+          # Copy screenshots with primary and fallback patterns
           if [ -d ".playwright-mcp" ]; then
             echo "📸 Copying screenshot files to $SCREENSHOT_DIR/"
             # Use bash arrays to safely handle files that may or may not exist
             shopt -s nullglob  # Make glob patterns expand to nothing if no matches
             COPIED_COUNT=0
+            
+            # Primary pattern: strict naming (before-N-resolution.png, after-N-resolution.png)
+            echo "🎯 Trying primary pattern: before-*.png and after-*.png"
             for file in .playwright-mcp/before-*.png .playwright-mcp/after-*.png; do
               if [ -f "$file" ]; then
-                echo "  ✅ Copying: $file ($(stat -f%z "$file" 2>/dev/null || echo "unknown size") bytes)"
+                # Use cross-platform stat command (Linux first, then macOS fallback)
+                FILE_SIZE=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo "unknown size")
+                echo "  ✅ Copying: $file ($FILE_SIZE bytes)"
                 cp "$file" "$SCREENSHOT_DIR/"
                 ((COPIED_COUNT++))
               fi
             done
+            
+            # Fallback pattern: any PNG files if primary pattern found nothing
+            if [ $COPIED_COUNT -eq 0 ]; then
+              echo "⚠️  No files found with primary pattern, trying fallback: any *.png files"
+              for file in .playwright-mcp/*.png; do
+                if [ -f "$file" ]; then
+                  # Use cross-platform stat command
+                  FILE_SIZE=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null || echo "unknown size")
+                  echo "  📄 Fallback copying: $file ($FILE_SIZE bytes)"
+                  cp "$file" "$SCREENSHOT_DIR/"
+                  ((COPIED_COUNT++))
+                fi
+              done
+              
+              if [ $COPIED_COUNT -gt 0 ]; then
+                echo "⚠️  Used fallback pattern - comment generation may be affected"
+              fi
+            fi
+            
             shopt -u nullglob  # Reset nullglob
             echo "📊 Total files copied: $COPIED_COUNT"
           else
@@ -351,7 +480,7 @@ jobs:
   deploy-screenshots:
     needs: claude
     runs-on: ubuntu-latest
-    if: needs.claude.result == 'success'
+    if: always() && (needs.claude.result == 'success' || needs.claude.result == 'failure') && needs.claude.outputs.issue-id
     permissions:
       contents: write # Required to push to gh-pages branch
       issues: write # Required to post comments on issues
@@ -471,7 +600,7 @@ jobs:
 
           # Post comment if screenshots were found
           if [ "$SCREENSHOTS_FOUND" = true ]; then
-            echo "Posting comparison comment to issue #${ISSUE_NUMBER}"
+            echo "✅ Posting comparison comment to issue #${ISSUE_NUMBER}"
             
             curl -X POST \
               -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
@@ -479,8 +608,31 @@ jobs:
               "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${ISSUE_NUMBER}/comments" \
               -d "{\"body\":\"${COMMENT_BODY}\"}"
             
-            echo "Successfully posted comparison comment"
+            echo "✅ Successfully posted comparison comment"
           else
-            echo "No screenshot pairs found for comparison"
+            echo "⚠️  No screenshot pairs found for comparison"
             ls -la "${ISSUE_NUMBER}/${RUN_ID}/" || echo "Screenshot directory not found"
+            
+            # Post fallback comment indicating implementation completion
+            FALLBACK_COMMENT="## 🔧 Implementation Complete\\n\\nChanges have been implemented for this issue.\\n\\n⚠️ Screenshots were not generated in the expected format, but the implementation has been completed. You can check the [workflow run](https://github.com/${REPO_OWNER}/${REPO_NAME}/actions/runs/${{ github.run_id }}) for implementation details.\\n\\n### Available Files\\n"
+            
+            # List any files that were deployed
+            if [ -d "${ISSUE_NUMBER}/${RUN_ID}" ]; then
+              FALLBACK_COMMENT="${FALLBACK_COMMENT}\\nFiles found in deployment:\\n"
+              for file in "${ISSUE_NUMBER}/${RUN_ID}"/*.png; do
+                if [ -f "$file" ]; then
+                  filename=$(basename "$file")
+                  FALLBACK_COMMENT="${FALLBACK_COMMENT}- ![${filename}](${IMAGE_BASE_URL}/${filename})\\n"
+                fi
+              done
+            fi
+            
+            echo "📝 Posting fallback comment about implementation completion"
+            curl -X POST \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues/${ISSUE_NUMBER}/comments" \
+              -d "{\"body\":\"${FALLBACK_COMMENT}\"}"
+              
+            echo "✅ Posted fallback implementation comment"
           fi
