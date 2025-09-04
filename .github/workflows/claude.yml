@@ -58,89 +58,6 @@ jobs:
         with:
           node-version: "18"
 
-      - name: Generate .claude directory structure
-        run: |
-          # Create .claude directory structure
-          mkdir -p .claude/hooks
-          
-          # Generate .claude/settings.local.json
-          cat > .claude/settings.local.json << 'EOF'
-          {
-            "hooks": {
-              "PreToolUse": [
-                {
-                  "matcher": "mcp__playwright__browser_take_screenshot",
-                  "hooks": [
-                    {
-                      "type": "command",
-                      "command": ".claude/hooks/screenshot-naming-enforcer.sh"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-          EOF
-          
-          # Generate .claude/hooks/screenshot-naming-enforcer.sh
-          cat > .claude/hooks/screenshot-naming-enforcer.sh << 'EOF'
-          #!/bin/bash
-          # Minimal screenshot naming enforcer for Node-RED workflow
-          # Patterns: before-[NUMBER]-[RESOLUTION].png, after-[NUMBER]-[RESOLUTION].png
-          
-          # Read JSON input and extract parameters
-          INPUT=$(cat)
-          FILENAME=$(echo "$INPUT" | jq -r '.tool_input.filename // ""')
-          TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""')
-          
-          # Only process screenshot tool calls
-          [[ "$TOOL_NAME" != "mcp__playwright__browser_take_screenshot" ]] && exit 0
-          
-          # Detect workflow step
-          detect_step() {
-              [[ -n "$CLAUDE_WORKFLOW_STEP" ]] && echo "$CLAUDE_WORKFLOW_STEP" && return
-              [[ -f "CLAUDE.md" ]] && echo "2" && return
-              ls .playwright-mcp/before-*.png >/dev/null 2>&1 && echo "3" || echo "1"
-          }
-          
-          CURRENT_STEP=$(detect_step)
-          
-          # Step 2 bypass: Allow any screenshot names during implementation
-          [[ "$CURRENT_STEP" == "2" ]] && exit 0
-          
-          # Validate filename exists
-          if [[ -z "$FILENAME" ]]; then
-              echo "❌ STEP $CURRENT_STEP: No filename specified" >&2
-              [[ "$CURRENT_STEP" == "1" ]] && echo "Required: before-[NUMBER]-[RESOLUTION].png" >&2
-              [[ "$CURRENT_STEP" == "3" ]] && echo "Required: after-[NUMBER]-[RESOLUTION].png" >&2
-              echo "Valid resolutions: desktop, laptop, tablet, mobile" >&2
-              exit 1
-          fi
-          
-          # Validate pattern with single regex
-          BASE=$(basename "$FILENAME")
-          EXPECTED_PREFIX=$([[ "$CURRENT_STEP" == "1" ]] && echo "before" || echo "after")
-          PATTERN="^${EXPECTED_PREFIX}-[0-9]+-(desktop|laptop|tablet|mobile)\.png$"
-          
-          if [[ ! "$BASE" =~ $PATTERN ]]; then
-              echo "❌ STEP $CURRENT_STEP: Invalid pattern '$BASE'" >&2
-              echo "Required: ${EXPECTED_PREFIX}-[NUMBER]-[RESOLUTION].png" >&2
-              echo "Valid resolutions: desktop, laptop, tablet, mobile" >&2
-              exit 1
-          fi
-          
-          exit 0
-          EOF
-          
-          # Make the hook script executable
-          chmod +x .claude/hooks/screenshot-naming-enforcer.sh
-          
-          # Verify the structure was created
-          echo "📁 Generated .claude directory structure:"
-          ls -la .claude/
-          ls -la .claude/hooks/
-          echo "✅ .claude directory ready for workflow"
-
       - name: Install dependencies
         run: npm install
 
@@ -160,6 +77,89 @@ jobs:
 
       - name: Ensure Playwright MCP directory exists
         run: mkdir -p .playwright-mcp
+
+      - name: Generate .claude directory structure
+        run: |
+          # Create .claude directory structure
+          mkdir -p .claude/hooks
+
+          # Generate .claude/settings.local.json
+          cat > .claude/settings.local.json << 'EOF'
+          {
+            "hooks": {
+              "PreToolUse": [
+                {
+                  "matcher": "mcp__playwright__browser_take_screenshot",
+                  "hooks": [
+                    {
+                      "type": "command",
+                      "command": ".claude/hooks/screenshot-naming-enforcer.sh"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+          EOF
+
+          # Generate .claude/hooks/screenshot-naming-enforcer.sh
+          cat > .claude/hooks/screenshot-naming-enforcer.sh << 'EOF'
+          #!/bin/bash
+          # Minimal screenshot naming enforcer for Node-RED workflow
+          # Patterns: before-[NUMBER]-[RESOLUTION].png, after-[NUMBER]-[RESOLUTION].png
+
+          # Read JSON input and extract parameters
+          INPUT=$(cat)
+          FILENAME=$(echo "$INPUT" | jq -r '.tool_input.filename // ""')
+          TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""')
+
+          # Only process screenshot tool calls
+          [[ "$TOOL_NAME" != "mcp__playwright__browser_take_screenshot" ]] && exit 0
+
+          # Detect workflow step
+          detect_step() {
+              [[ -n "$CLAUDE_WORKFLOW_STEP" ]] && echo "$CLAUDE_WORKFLOW_STEP" && return
+              [[ -f "CLAUDE.md" ]] && echo "2" && return
+              ls .playwright-mcp/before-*.png >/dev/null 2>&1 && echo "3" || echo "1"
+          }
+
+          CURRENT_STEP=$(detect_step)
+
+          # Step 2 bypass: Allow any screenshot names during implementation
+          [[ "$CURRENT_STEP" == "2" ]] && exit 0
+
+          # Validate filename exists
+          if [[ -z "$FILENAME" ]]; then
+              echo "❌ STEP $CURRENT_STEP: No filename specified" >&2
+              [[ "$CURRENT_STEP" == "1" ]] && echo "Required: before-[NUMBER]-[RESOLUTION].png" >&2
+              [[ "$CURRENT_STEP" == "3" ]] && echo "Required: after-[NUMBER]-[RESOLUTION].png" >&2
+              echo "Valid resolutions: desktop, laptop, tablet, mobile" >&2
+              exit 1
+          fi
+
+          # Validate pattern with single regex
+          BASE=$(basename "$FILENAME")
+          EXPECTED_PREFIX=$([[ "$CURRENT_STEP" == "1" ]] && echo "before" || echo "after")
+          PATTERN="^${EXPECTED_PREFIX}-[0-9]+-(desktop|laptop|tablet|mobile)\.png$"
+
+          if [[ ! "$BASE" =~ $PATTERN ]]; then
+              echo "❌ STEP $CURRENT_STEP: Invalid pattern '$BASE'" >&2
+              echo "Required: ${EXPECTED_PREFIX}-[NUMBER]-[RESOLUTION].png" >&2
+              echo "Valid resolutions: desktop, laptop, tablet, mobile" >&2
+              exit 1
+          fi
+
+          exit 0
+          EOF
+
+          # Make the hook script executable
+          chmod +x .claude/hooks/screenshot-naming-enforcer.sh
+
+          # Verify the structure was created
+          echo "📁 Generated .claude directory structure:"
+          ls -la .claude/
+          ls -la .claude/hooks/
+          echo "✅ .claude directory ready for workflow"
 
       # Create a persistent plan file for state sharing between steps
       - name: Initialize plan file
