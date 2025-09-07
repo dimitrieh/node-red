@@ -18,6 +18,7 @@ jobs:
       (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     runs-on: ubuntu-latest
+    timeout-minutes: 60  # Global job timeout to prevent runaway executions
     outputs:
       issue-id: ${{ steps.detect-branch.outputs.issue_id }}
     permissions:
@@ -58,12 +59,34 @@ jobs:
         with:
           node-version: "18"
 
+      - name: Cache Node modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install dependencies
         run: npm install
 
       - name: Install Playwright browsers and dependencies
-        timeout-minutes: 5
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 10
+        run: |
+          # Add retry logic for more reliable installation
+          for i in {1..3}; do
+            npx playwright install --with-deps chromium && break
+            echo "Retry $i/3 failed, waiting..."
+            sleep 10
+          done
 
       - name: Build Node-RED
         run: npm run build
@@ -198,6 +221,11 @@ jobs:
                - UX considerations: visual hierarchy, color consistency, sufficient contrast, intuitive interactions, accessibility, touch-friendly sizing. Adherence to existing design patterns takes priority unless requested differently. Do not extend scope unnecessarily.
             4. Navigate Node-RED and take comprehensive initial screenshots of ALL areas that will be modified using playwright:
                - Node-RED server should be running on http://localhost:1880 (verify with curl) otherwise restart it
+               - IMPORTANT: Use smart interaction strategies when navigating:
+                 * Before clicking any element, verify it's actually interactive using browser_evaluate
+                 * If a click times out, the element may be obscured - try JavaScript clicks or scrolling into view
+                 * Different resolutions have different layouts - adapt your approach accordingly
+                 * Wait briefly after UI state changes for animations to complete
                - Identify all distinct UI areas/components that will be affected by the requested changes
                - For EACH identified area, capture screenshots using this numbering system:
                  * Area 1: Main editor/workspace - before-1-[resolution].png  
@@ -296,10 +324,23 @@ jobs:
           ### MANDATORY Implementation Loop Process
           1. READ the detailed plan from plan.md - this contains the complete implementation strategy that has already been created
           2. Make SMALL incremental changes (not the entire implementation at once)
+             - IMPORTANT: File operation best practices to avoid errors:
+               * ALWAYS use Read before Edit - never edit a file you haven't read first
+               * When using Edit, copy the EXACT string including all whitespace and indentation
+               * Verify file paths exist with Glob before trying to read/edit them
+               * If "string not found" error occurs, re-read the file and check for recent changes
+               * Use Write for new files, Edit for existing files
           3. For frontend changes: run npm run build to rebuild assets
           4. For backend/core changes: restart Node-RED if needed using:
           kill $(cat node-red.pid) && npm start & && echo $! > node-red.pid && sleep 10
           5. **MANDATORY: Navigate to http://localhost:1880 and test with Playwright**
+             - IMPORTANT: Use smart interaction strategies to avoid timeouts:
+               * Before clicking any element, verify it's actually interactive using browser_evaluate to check visibility and position
+               * If an element click times out after 5 seconds, it's likely obscured or not in view - investigate why
+               * Try alternative interaction methods: JavaScript clicks via browser_evaluate, waiting for animations to complete, or scrolling into view
+               * Different resolutions may have different UI layouts - what works on desktop might not work on mobile/tablet
+               * After any UI state changes (opening menus, panels, etc.), wait briefly for animations to complete before next action
+               * If you need to temporarily modify the UI for testing (hiding elements, etc.), restore the original state afterward
           6. **MANDATORY: Take screenshot and analyze what you see vs what was expected**
           7. **If testing reveals issues: make additional changes and repeat from step 3**
           8. **Repeat steps 2-7 until each small change is verified working**
@@ -406,6 +447,11 @@ jobs:
             1. Understand the last commit and the already implemented changes of the implementation plan that is saved in plan.md
             2. Navigate Node-RED and take comprehensive screenshots of ALL areas that have been modified already using playwright:
                - Node-RED server should be running on http://localhost:1880 (verify with curl) otherwise restart it
+               - IMPORTANT: Use smart interaction strategies when navigating:
+                 * Before clicking any element, verify it's actually interactive using browser_evaluate
+                 * If a click times out, the element may be obscured - try JavaScript clicks or scrolling into view
+                 * Different resolutions have different layouts - adapt your approach accordingly
+                 * Wait briefly after UI state changes for animations to complete
                - Identify which UI areas were modified by checking the directory for any existing screenshots with the following naming convention: after-*.png 
                - For EACH identified area, capture screenshots using this numbering system:
                  * Area 1: Main editor/workspace - after-1-[resolution].png  
