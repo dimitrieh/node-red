@@ -45,6 +45,7 @@ jobs:
             Gruntfile.js
             jsdoc.json
             LICENSE
+            NODE-RED-ARCHITECTURE.md
             nodemon.json
             package.json
             packages/
@@ -211,9 +212,10 @@ jobs:
             ## CRITICAL INSTRUCTION: ANALYSIS ONLY - NO CHANGES
             Your ONLY task is to understand the request and create a detailed plan. You MUST NOT make any code changes, file modifications, or implementations in this session.
             ## Understand and Create Plan
-            1. Read the GitHub issue/comment that triggered this workflow
-            2. Explore the Node-RED codebase to understand current implementation
-            3. Create a specific implementation plan and SAVE IT TO plan.md:
+            1. FIRST: Read NODE-RED-ARCHITECTURE.md to understand the codebase structure
+            2. Read the GitHub issue/comment that triggered this workflow
+            3. Explore the Node-RED codebase using the architecture knowledge from NODE-RED-ARCHITECTURE.md
+            4. Create a specific implementation plan and SAVE IT TO plan.md:
                - Which specific UI areas/components will be affected
                - What files need to be modified  
                - What the expected visual changes will be
@@ -317,7 +319,8 @@ jobs:
           ## CRITICAL INSTRUCTION: IMPLEMENT CHANGES THROUGH ITERATIVELY TESTING CHANGES AND REFINING BASED ON PLAYWRIGHT FEEDBACK
           You are continuing the work from a previous session by implementing changes for GitHub issue #${{ github.event.issue.number || github.event.pull_request.number }}
           ## Context:
-          - Implementation plan is saved in plan.md - READ THIS FIRST
+          - FIRST: Read NODE-RED-ARCHITECTURE.md to understand the codebase structure
+          - Implementation plan is saved in plan.md - READ THIS AFTER the architecture file
           - Node-RED server should be running on http://localhost:1880 (verify with curl) otherwise restart it
           ## Implement and iteratively adjust based on Playwright testing until completion of plan
           You are working on the implementation phase with iterative testing and refinement. Follow this process:
@@ -444,8 +447,9 @@ jobs:
             ## CRITICAL INSTRUCTION: SCREENSHOTS ONLY - NO CHANGES
             Your ONLY task is to understand the changes made to Node-RED by looking at the last commit and the already implemented changes of the implementation plan that is saved in plan.md. You MUST NOT make any code changes, file modifications, or implementations.
             ## Take Screenshots
-            1. Understand the last commit and the already implemented changes of the implementation plan that is saved in plan.md
-            2. Navigate Node-RED and take comprehensive screenshots of ALL areas that have been modified already using playwright:
+            1. Read NODE-RED-ARCHITECTURE.md if you need to understand UI component locations
+            2. Understand the last commit and the already implemented changes of the implementation plan that is saved in plan.md
+            3. Navigate Node-RED and take comprehensive screenshots of ALL areas that have been modified already using playwright:
                - Node-RED server should be running on http://localhost:1880 (verify with curl) otherwise restart it
                - IMPORTANT: Use smart interaction strategies when navigating:
                  * Before clicking any element, verify it's actually interactive using browser_evaluate
