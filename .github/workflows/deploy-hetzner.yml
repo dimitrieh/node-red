@@ -20,11 +20,7 @@ on:
         options:
           - deploy
           - cleanup
-      remove_dashboard:
-        description: 'Remove dashboard completely during cleanup'
-        required: false
-        default: false
-        type: boolean
+          - cleanup-with-dashboard
 
 permissions:
   contents: read
@@ -225,7 +221,7 @@ jobs:
   cleanup:
     name: Cleanup Hetzner Deployment
     needs: validate-branch
-    if: github.event.inputs.action == 'cleanup'
+    if: github.event.inputs.action == 'cleanup' || github.event.inputs.action == 'cleanup-with-dashboard'
     runs-on: ubuntu-latest
     environment: nr-experiments
     steps:
@@ -262,9 +258,15 @@ jobs:
           GITHUB_REPO: ${{ env.GITHUB_REPO }}
           GITHUB_ISSUES_REPO: ${{ env.GITHUB_ISSUES_REPO }}
           BRANCH_NAME: ${{ github.event.inputs.branch || github.ref_name }}
-          REMOVE_DASHBOARD: ${{ github.event.inputs.remove_dashboard }}
+          ACTION: ${{ github.event.inputs.action }}
         run: |
           set -euo pipefail
+          
+          # Determine if we should remove dashboard based on action
+          REMOVE_DASHBOARD="false"
+          if [ "$ACTION" = "cleanup-with-dashboard" ]; then
+            REMOVE_DASHBOARD="true"
+          fi
           
           echo "::group::🧹 Starting cleanup of Hetzner deployment"
           echo "📋 Branch: $BRANCH_NAME"
@@ -315,7 +317,7 @@ jobs:
   validation-failed:
     name: Branch Validation Failed
     needs: validate-branch
-    if: needs.validate-branch.outputs.branch_valid != 'true'
+    if: needs.validate-branch.outputs.branch_valid != 'true' && (github.event.inputs.action == 'deploy' || github.event_name == 'push')
     runs-on: ubuntu-latest
     steps:
       - name: Display validation failure
