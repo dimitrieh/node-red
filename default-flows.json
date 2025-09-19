@@ -185,7 +185,7 @@
         "id": "comment-node-1",
         "type": "comment",
         "z": "demo-flow-1",
-        "name": "This Node-RED environment is in demo mode. \n Some things are simulated like deploys or do not work \n on purpose like actual debug output. Other than that, \n these experiments are meant to showcase a Node-RED \n interface UX change for quick feedback purposes, the \n experience is likely buggy due to this not being \n production code.",
+        "name": "This Node-RED environment is in demo mode. \\n Some things are simulated like deploys or do not work \\n on purpose like actual debug output. Other than that, \\n these experiments are meant to showcase a Node-RED \\n interface UX change for quick feedback purposes, the \\n experience is likely buggy due to this not being \\n production code.",
         "info": "",
         "x": 150,
         "y": 120,
