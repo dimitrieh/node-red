@@ -1,0 +1,194 @@
+[
+    {
+        "id": "demo-flow-1",
+        "type": "tab",
+        "label": "Welcome Flow",
+        "disabled": false,
+        "info": "This is a demo flow showing basic Node-RED capabilities",
+        "env": []
+    },
+    {
+        "id": "inject-node-1",
+        "type": "inject",
+        "z": "demo-flow-1",
+        "name": "Click to start",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "demo",
+        "payload": "{\"message\":\"Hello from Node-RED!\",\"timestamp\":$millis()}",
+        "payloadType": "jsonata",
+        "x": 150,
+        "y": 100,
+        "wires": [
+            ["function-node-1"]
+        ]
+    },
+    {
+        "id": "function-node-1",
+        "type": "function",
+        "z": "demo-flow-1",
+        "name": "Process Message",
+        "func": "// This function processes the incoming message\nconst timestamp = new Date(msg.payload.timestamp);\nmsg.payload.formatted = {\n    original: msg.payload.message,\n    uppercase: msg.payload.message.toUpperCase(),\n    time: timestamp.toLocaleString(),\n    wordCount: msg.payload.message.split(' ').length\n};\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 350,
+        "y": 100,
+        "wires": [
+            ["debug-node-1", "change-node-1"]
+        ]
+    },
+    {
+        "id": "debug-node-1",
+        "type": "debug",
+        "z": "demo-flow-1",
+        "name": "Output",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload.formatted",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 550,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "change-node-1",
+        "type": "change",
+        "z": "demo-flow-1",
+        "name": "Extract Stats",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.formatted.wordCount",
+                "tot": "msg"
+            },
+            {
+                "t": "set",
+                "p": "topic",
+                "pt": "msg",
+                "to": "statistics",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 350,
+        "y": 200,
+        "wires": [
+            ["switch-node-1"]
+        ]
+    },
+    {
+        "id": "switch-node-1",
+        "type": "switch",
+        "z": "demo-flow-1",
+        "name": "Check Count",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "lt",
+                "v": "3",
+                "vt": "num"
+            },
+            {
+                "t": "gte",
+                "v": "3",
+                "vt": "num"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 2,
+        "x": 530,
+        "y": 200,
+        "wires": [
+            ["template-node-1"],
+            ["template-node-2"]
+        ]
+    },
+    {
+        "id": "template-node-1",
+        "type": "template",
+        "z": "demo-flow-1",
+        "name": "Short Message",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "Your message had only {{payload}} words.",
+        "output": "str",
+        "x": 720,
+        "y": 180,
+        "wires": [
+            ["debug-node-2"]
+        ]
+    },
+    {
+        "id": "template-node-2",
+        "type": "template",
+        "z": "demo-flow-1",
+        "name": "Long Message",
+        "field": "payload",
+        "fieldType": "msg",
+        "format": "handlebars",
+        "syntax": "mustache",
+        "template": "Great! Your message had {{payload}} words.",
+        "output": "str",
+        "x": 720,
+        "y": 220,
+        "wires": [
+            ["debug-node-2"]
+        ]
+    },
+    {
+        "id": "debug-node-2",
+        "type": "debug",
+        "z": "demo-flow-1",
+        "name": "Statistics",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 900,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "comment-node-1",
+        "type": "comment",
+        "z": "demo-flow-1",
+        "name": "Welcome to Node-RED!",
+        "info": "This demonstration flow shows basic Node-RED concepts:\n\n1. **Inject Node**: Click the button to trigger the flow\n2. **Function Node**: Process data with JavaScript\n3. **Debug Node**: View output in the debug panel\n4. **Change Node**: Transform message properties\n5. **Switch Node**: Route messages based on conditions\n6. **Template Node**: Format output messages\n\nTry clicking the inject button and watch the data flow through the nodes!",
+        "x": 150,
+        "y": 40,
+        "wires": []
+    }
+]
