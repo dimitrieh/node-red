@@ -561,23 +561,31 @@ duplicate_survey() {
     echo "$new_survey_id"
 }
 
-# Function to setup survey for issue branches
+# Function to setup survey for issue and experiment branches
 setup_issue_survey() {
     local branch="$1"
     
     log "${BLUE}🚀 [TALLY] Starting survey setup for branch: '$branch'${NC}"
     
-    # Extract issue ID from branch name using existing pattern
+    # Extract issue ID from branch name (issue-NNNN pattern)
     local issue_id=$(echo "$branch" | sed -n 's/^issue-\([0-9]\+\)$/\1/p')
     
-    if [ -z "$issue_id" ]; then
-        log "${BLUE}ℹ️  [TALLY] Branch '$branch' is not an issue branch (no issue-NNNN pattern), skipping survey setup${NC}"
+    # Extract experiment ID from branch name (experiment-* pattern)
+    local experiment_id=$(echo "$branch" | sed -n 's/^experiment-\(.\+\)$/\1/p')
+    
+    if [ -z "$issue_id" ] && [ -z "$experiment_id" ]; then
+        log "${BLUE}ℹ️  [TALLY] Branch '$branch' is not an issue or experiment branch, skipping survey setup${NC}"
         export TALLY_SURVEY_ID=""
         return 0
     fi
     
-    log "${GREEN}✅ [TALLY] Detected issue branch with ID: $issue_id${NC}"
-    log "${BLUE}🗣️  [TALLY] Setting up survey for issue branch: $branch${NC}"
+    if [ -n "$issue_id" ]; then
+        log "${GREEN}✅ [TALLY] Detected issue branch with ID: $issue_id${NC}"
+        log "${BLUE}🗣️  [TALLY] Setting up survey for issue branch: $branch${NC}"
+    elif [ -n "$experiment_id" ]; then
+        log "${GREEN}✅ [TALLY] Detected experiment branch: $experiment_id${NC}"
+        log "${BLUE}🗣️  [TALLY] Setting up survey for experiment branch: $branch${NC}"
+    fi
     
     # Debug: Show branch name details
     log "${BLUE}🔍 [TALLY] Branch name debug info:${NC}"
