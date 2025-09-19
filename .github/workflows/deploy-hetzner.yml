@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'issue-*'
+      - 'experiment-*'
       - 'experiment-template'
   workflow_dispatch:
     inputs:
