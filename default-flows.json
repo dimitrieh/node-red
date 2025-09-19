@@ -29,7 +29,7 @@
         "payload": "{\"message\":\"Hello from Node-RED!\",\"timestamp\":$millis()}",
         "payloadType": "jsonata",
         "x": 150,
-        "y": 100,
+        "y": 340,
         "wires": [
             ["function-node-1"]
         ]
@@ -47,7 +47,7 @@
         "finalize": "",
         "libs": [],
         "x": 350,
-        "y": 100,
+        "y": 340,
         "wires": [
             ["debug-node-1", "change-node-1"]
         ]
@@ -66,7 +66,7 @@
         "statusVal": "",
         "statusType": "auto",
         "x": 550,
-        "y": 60,
+        "y": 300,
         "wires": []
     },
     {
@@ -96,7 +96,7 @@
         "to": "",
         "reg": false,
         "x": 350,
-        "y": 200,
+        "y": 440,
         "wires": [
             ["switch-node-1"]
         ]
@@ -124,7 +124,7 @@
         "repair": false,
         "outputs": 2,
         "x": 530,
-        "y": 200,
+        "y": 440,
         "wires": [
             ["template-node-1"],
             ["template-node-2"]
@@ -142,7 +142,7 @@
         "template": "Your message had only {{payload}} words.",
         "output": "str",
         "x": 720,
-        "y": 180,
+        "y": 420,
         "wires": [
             ["debug-node-2"]
         ]
@@ -159,7 +159,7 @@
         "template": "Great! Your message had {{payload}} words.",
         "output": "str",
         "x": 720,
-        "y": 220,
+        "y": 460,
         "wires": [
             ["debug-node-2"]
         ]
@@ -178,17 +178,17 @@
         "statusVal": "payload",
         "statusType": "auto",
         "x": 900,
-        "y": 200,
+        "y": 440,
         "wires": []
     },
     {
         "id": "comment-node-1",
         "type": "comment",
         "z": "demo-flow-1",
-        "name": "Welcome to Node-RED!",
-        "info": "This demonstration flow shows basic Node-RED concepts:\n\n1. **Inject Node**: Click the button to trigger the flow\n2. **Function Node**: Process data with JavaScript\n3. **Debug Node**: View output in the debug panel\n4. **Change Node**: Transform message properties\n5. **Switch Node**: Route messages based on conditions\n6. **Template Node**: Format output messages\n\nTry clicking the inject button and watch the data flow through the nodes!",
+        "name": "This Node-RED environment is in demo mode. \n Some things are simulated like deploys or do not work \n on purpose like actual debug output. Other than that, \n these experiments are meant to showcase a Node-RED \n interface UX change for quick feedback purposes, the \n experience is likely buggy due to this not being \n production code.",
+        "info": "",
         "x": 150,
-        "y": 40,
+        "y": 120,
         "wires": []
     }
 ]
