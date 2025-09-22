@@ -853,12 +853,6 @@ generate_dashboard_html() {
         .section-description { color: #666; margin-bottom: 20px; font-size: 1rem; }
         .section-divider { margin: 40px 0; border: none; border-top: 2px dashed #e0e0e0; }
         .claude-section { background: #f8f9fa; padding: 20px; border-radius: 8px; }
-        .ttl-indicator { margin-top: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107; }
-        .ttl-indicator.ttl-expiring { background: #f8d7da; border-color: #f5c6cb; }
-        .ttl-label { color: #856404; font-size: 0.9em; }
-        .ttl-indicator.ttl-expiring .ttl-label { color: #721c24; }
-        .ttl-value { font-weight: bold; color: #856404; }
-        .ttl-indicator.ttl-expiring .ttl-value { color: #d73502; }
         @media (max-width: 900px) {
             .controls { flex-direction: column; align-items: stretch; }
             .meta-info { width: 100%; text-align: center; }
@@ -959,33 +953,38 @@ generate_dashboard_html() {
             const claudeExperiments = filteredContainers.filter(c => c.is_claude === true);
             const manualExperiments = filteredContainers.filter(c => c.is_claude !== true);
             
-            let html = '';
-            
-            // Manual experiments section
-            if (manualExperiments.length > 0) {
-                html += '<div class="experiments-section">';
-                html += '<h2 class="section-title">Manual Experiments</h2>';
-                html += '<div class="instances-grid">';
-                html += manualExperiments.map(cont => createContainerCard(cont)).join('');
-                html += '</div></div>';
+            // For manual experiments only, use the original simple grid
+            if (claudeExperiments.length === 0) {
+                // Original behavior - all cards in main grid
+                container.innerHTML = filteredContainers.map(cont => createContainerCard(cont)).join('');
+            } else {
+                // When we have Claude experiments, show sections
+                let html = '';
+                
+                // Manual experiments section
+                if (manualExperiments.length > 0) {
+                    html += '<div class="experiments-section">';
+                    html += '<h2 class="section-title">Manual Experiments</h2>';
+                    html += '</div>';
+                    html += manualExperiments.map(cont => createContainerCard(cont)).join('');
+                }
+                
+                // Divider between sections
+                if (manualExperiments.length > 0 && claudeExperiments.length > 0) {
+                    html += '<hr class="section-divider" style="grid-column: 1/-1;">';
+                }
+                
+                // Claude experiments section header
+                if (claudeExperiments.length > 0) {
+                    html += '<div class="experiments-section claude-section" style="grid-column: 1/-1;">';
+                    html += `<h2 class="section-title">Auto-Generated Experiments (${claudeExperiments.length})</h2>`;
+                    html += '<p class="section-description">The experiments below are auto-generated and may have unintended changes. Mostly for quickly checking generated results.</p>';
+                    html += '</div>';
+                    html += claudeExperiments.map(cont => createContainerCard(cont, true)).join('');
+                }
+                
+                container.innerHTML = html;
             }
-            
-            // Divider between sections
-            if (manualExperiments.length > 0 && claudeExperiments.length > 0) {
-                html += '<hr class="section-divider">';
-            }
-            
-            // Claude experiments section
-            if (claudeExperiments.length > 0) {
-                html += '<div class="experiments-section claude-section">';
-                html += `<h2 class="section-title">Auto-Generated Experiments (${claudeExperiments.length})</h2>`;
-                html += '<p class="section-description">These experiments are automatically created by Claude from GitHub issues and will be removed after 7 days</p>';
-                html += '<div class="instances-grid">';
-                html += claudeExperiments.map(cont => createContainerCard(cont, true)).join('');
-                html += '</div></div>';
-            }
-            
-            container.innerHTML = html;
             container.querySelectorAll('.instance-card').forEach(card => {
                 card.addEventListener('click', function(event) {
                     if (event.target.tagName === 'A' || event.target.closest('a')) { return; }
@@ -1001,25 +1000,12 @@ generate_dashboard_html() {
             const deployedTime = deployedDate.toLocaleString();
             const deployedRelative = getRelativeTime(deployedDate);
             
-            // Calculate TTL for Claude experiments
-            let ttlIndicator = '';
-            if (isClaudeExperiment) {
-                const now = new Date();
-                const ageInMs = now - deployedDate;
-                const ageInDays = Math.floor(ageInMs / (1000 * 60 * 60 * 24));
-                const remainingDays = Math.max(0, 7 - ageInDays);
-                const ttlClass = remainingDays <= 1 ? 'ttl-expiring' : '';
-                ttlIndicator = `
-                    <div class="ttl-indicator ${ttlClass}">
-                        <span class="ttl-label">Auto-removal in:</span>
-                        <span class="ttl-value">${remainingDays} day${remainingDays !== 1 ? 's' : ''}</span>
-                    </div>
-                `;
-            }
             
             let versionInfo = '';
             if (container.branch && container.commit && container.branch_url && container.commit_url) {
-                versionInfo = `<a href="${container.branch_url}" target="_blank">${container.branch}</a> | <a href="${container.commit_url}" target="_blank">${container.commit}</a>`;
+                // Strip 'claude/' prefix from display name but keep full branch in URL
+                const displayBranch = container.branch.replace(/^claude\//, '');
+                versionInfo = `<a href="${container.branch_url}" target="_blank">${displayBranch}</a> | <a href="${container.commit_url}" target="_blank">${container.commit}</a>`;
             }
             return `
                 <div class="instance-card ${statusClass}" data-url="${container.url}">
@@ -1052,7 +1038,6 @@ generate_dashboard_html() {
                             <span class="info-label">URL:</span>
                             <span class="info-value"><a href="${container.url}" target="_blank">${container.url}</a></span>
                         </div>
-                        ${ttlIndicator}
                     </div>
                 </div>
             `;
