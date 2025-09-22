@@ -675,9 +675,12 @@ jobs:
           echo "Generating comparison comment for issue #${ISSUE_NUMBER}"
           echo "Using run ID: ${RUN_ID}"
           echo "Base URL: ${IMAGE_BASE_URL}"
+          
+          # Get current branch name
+          CURRENT_BRANCH="${{ github.ref_name }}"
 
-          # Build comparison comment
-          COMMENT_BODY="## 📸 Visual Comparison\n\n"
+          # Build comparison comment with branch information
+          COMMENT_BODY="## 📸 Visual Comparison\n\n**Branch:** \`${CURRENT_BRANCH}\`\n**Workflow Run:** [#${{ github.run_id }}](https://github.com/${REPO_OWNER}/${REPO_NAME}/actions/runs/${{ github.run_id }})\n\n"
 
           # Check for screenshot pairs across different numbering and resolution patterns
           SCREENSHOTS_FOUND=false
