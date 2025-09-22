@@ -1251,11 +1251,20 @@ notify_issue_removal() {
         local api_url="https://api.github.com/repos/dimitrieh/node-red/issues/${issue_number}/comments"
         local body="{\"body\": \"${message}\\n\\n_Branch: \\\`${branch}\\\`_\\n_Removed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')_\"}"
         
-        curl -s -X POST \
+        if response=$(curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             "$api_url" \
-            -d "$body" 2>/dev/null || log "Failed to notify issue #${issue_number} about removal"
+            -d "$body" 2>&1); then
+            # Check if response contains an error
+            if echo "$response" | grep -q '"message"'; then
+                log "${YELLOW}⚠️  Failed to notify issue #${issue_number} about removal: $(echo "$response" | grep '"message"' | head -1)${NC}"
+            else
+                log "${GREEN}✅ Notified issue #${issue_number} about removal${NC}"
+            fi
+        else
+            log "${YELLOW}⚠️  Failed to notify issue #${issue_number} about removal${NC}"
+        fi
     fi
 }
 
@@ -1278,13 +1287,20 @@ notify_deployment_success() {
             local api_url="https://api.github.com/repos/dimitrieh/node-red/issues/${issue_number}/comments"
             local body="{\"body\": \"${message}\\n\\n_Branch: \\\`${branch}\\\`_\\n_Deployed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')_\"}"
             
-            curl -s -X POST \
+            if response=$(curl -s -X POST \
                 -H "Authorization: token $GITHUB_TOKEN" \
                 -H "Accept: application/vnd.github.v3+json" \
                 "$api_url" \
-                -d "$body" 2>/dev/null || log "Failed to notify issue #${issue_number} about deployment"
-            
-            log "${GREEN}✅ Notified issue #${issue_number} about deployment${NC}"
+                -d "$body" 2>&1); then
+                # Check if response contains an error
+                if echo "$response" | grep -q '"message"'; then
+                    log "${YELLOW}⚠️  Failed to notify issue #${issue_number}: $(echo "$response" | grep '"message"' | head -1)${NC}"
+                else
+                    log "${GREEN}✅ Notified issue #${issue_number} about deployment${NC}"
+                fi
+            else
+                log "${YELLOW}⚠️  Failed to notify issue #${issue_number} about deployment${NC}"
+            fi
         fi
     fi
 }
