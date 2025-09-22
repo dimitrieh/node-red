@@ -1242,9 +1242,9 @@ notify_issue_removal() {
         # Prepare message based on reason
         local message=""
         if [ "$reason" = "TTL_EXPIRED" ]; then
-            message="**Experiment Auto-Removed**\n\nThis experiment has been automatically removed after ${age_days} days (7-day TTL exceeded)."
+            message="**Experiment Auto-Removed**\\n\\nThis experiment has been automatically removed after ${age_days} days (7-day TTL exceeded)."
         else
-            message="**Experiment Manually Removed**\n\nThis experiment has been manually removed after ${age_days} days of runtime."
+            message="**Experiment Manually Removed**\\n\\nThis experiment has been manually removed after ${age_days} days of runtime."
         fi
         
         # Post to GitHub issue
@@ -1281,7 +1281,7 @@ notify_deployment_success() {
             local deployment_url="https://nr-${branch}.${TAILNET}.ts.net"
             local dashboard_url="https://dashboard.${TAILNET}.ts.net"
             
-            local message="**Experiment Deployed**\n\nYour Node-RED experiment is now live at:\n${deployment_url}\n\nView all experiments: ${dashboard_url}\n\nThis deployment will automatically expire in 7 days."
+            local message="**Experiment Deployed**\\n\\nYour Node-RED experiment is now live at:\\n${deployment_url}\\n\\nView all experiments: ${dashboard_url}\\n\\nThis deployment will automatically expire in 7 days."
             
             # Post deployment notification
             local api_url="https://api.github.com/repos/dimitrieh/node-red/issues/${issue_number}/comments"
