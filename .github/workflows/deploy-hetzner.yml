@@ -26,6 +26,7 @@ on:
 
 permissions:
   contents: read
+  issues: write  # Required for posting comments to issues
 
 # Concurrency control to prevent deployment conflicts
 # Only one deployment can run at a time to protect server resources and dashboard integrity
