@@ -1007,12 +1007,6 @@ generate_dashboard_html() {
             const deployedRelative = getRelativeTime(deployedDate);
             
             
-            let versionInfo = '';
-            if (container.branch && container.commit && container.branch_url && container.commit_url) {
-                // Strip 'claude/' prefix from display name but keep full branch in URL
-                const displayBranch = container.branch.replace(/^claude\//, '');
-                versionInfo = `<a href="${container.branch_url}" target="_blank">${displayBranch}</a> | <a href="${container.commit_url}" target="_blank">${container.commit}</a>`;
-            }
             return `
                 <div class="instance-card ${statusClass}" data-url="${container.url}">
                     <div class="instance-header">
@@ -1024,25 +1018,29 @@ generate_dashboard_html() {
                             <span class="info-label">Deployed:</span>
                             <span class="info-value" title="${deployedTime}">${deployedRelative}</span>
                         </div>
-                        ${versionInfo ? `
+                        ${container.branch && container.commit ? `
                         <div class="info-row">
-                            <span class="info-label">Version:</span>
-                            <span class="info-value">${versionInfo}</span>
+                            <span class="info-label">Branch:</span>
+                            <span class="info-value"><a href="${container.branch_url}" target="_blank">${container.branch.replace(/^claude\//, '')}</a></span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Commit:</span>
+                            <span class="info-value"><a href="${container.commit_url}" target="_blank">${container.commit}</a></span>
                         </div>
                         ` : ''}
                         <div class="info-row">
                             <span class="info-label">Image:</span>
-                            <span class="info-value">${container.image}</span>
+                            <span class="info-value"><code>${container.image}</code></span>
                         </div>
                         ${container.issue_url ? `
                         <div class="info-row">
                             <span class="info-label">Issue:</span>
-                            <span class="info-value"><a href="${container.issue_url}" target="_blank">${container.issue_url}</a></span>
+                            <span class="info-value"><a href="${container.issue_url}" target="_blank">#${container.issue_url.split('/').pop()}</a></span>
                         </div>
                         ` : ''}
                         <div class="info-row">
-                            <span class="info-label">URL:</span>
-                            <span class="info-value"><a href="${container.url}" target="_blank">${container.url}</a></span>
+                            <span class="info-label">Experiment:</span>
+                            <span class="info-value"><a href="${container.url}" target="_blank">link</a></span>
                         </div>
                     </div>
                 </div>
