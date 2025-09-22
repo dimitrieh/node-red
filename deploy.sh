@@ -658,11 +658,14 @@ setup_issue_survey() {
 
 # Function to get and validate branch name (only called during local execution)
 get_branch_name() {
-    # Get current git branch and sanitize it for Docker/Tailscale naming
-    BRANCH_NAME=$(git branch --show-current | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
+    # Get current git branch (original, with slashes)
+    GIT_BRANCH_NAME=$(git branch --show-current)
+    
+    # Sanitize branch name for Docker/Tailscale naming (replace non-alphanumeric with hyphens)
+    BRANCH_NAME=$(echo "$GIT_BRANCH_NAME" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
     
     # Validate branch name
-    if [ -z "$BRANCH_NAME" ]; then
+    if [ -z "$GIT_BRANCH_NAME" ]; then
         echo -e "${RED}❌ Error: Could not determine git branch${NC}"
         exit 1
     fi
@@ -684,7 +687,7 @@ check_uncommitted_changes() {
         echo "Run the following commands:"
         echo "  git add ."
         echo "  git commit -m 'Your commit message'"
-        echo "  git push origin $BRANCH_NAME"
+        echo "  git push origin $GIT_BRANCH_NAME"
         exit 1
     fi
 }
@@ -692,21 +695,21 @@ check_uncommitted_changes() {
 # Function to check if local and remote branches are in sync
 check_branch_sync() {
     # Fetch latest from remote
-    git fetch origin "$BRANCH_NAME" 2>/dev/null || {
+    git fetch origin "$GIT_BRANCH_NAME" 2>/dev/null || {
         echo -e "${YELLOW}⚠️  Warning: Could not fetch from remote. Branch may not exist on remote.${NC}"
         echo "Please push your branch to remote first:"
-        echo "  git push -u origin $BRANCH_NAME"
+        echo "  git push -u origin $GIT_BRANCH_NAME"
         exit 1
     }
     
     # Get commit hashes
     LOCAL_COMMIT=$(git rev-parse HEAD)
-    REMOTE_COMMIT=$(git rev-parse "origin/$BRANCH_NAME" 2>/dev/null || echo "")
+    REMOTE_COMMIT=$(git rev-parse "origin/$GIT_BRANCH_NAME" 2>/dev/null || echo "")
     
     if [ -z "$REMOTE_COMMIT" ]; then
-        echo -e "${YELLOW}⚠️  Warning: Remote branch origin/$BRANCH_NAME does not exist.${NC}"
+        echo -e "${YELLOW}⚠️  Warning: Remote branch origin/$GIT_BRANCH_NAME does not exist.${NC}"
         echo "Please push your branch to remote first:"
-        echo "  git push -u origin $BRANCH_NAME"
+        echo "  git push -u origin $GIT_BRANCH_NAME"
         exit 1
     fi
     
@@ -716,8 +719,8 @@ check_branch_sync() {
         echo "Remote: $REMOTE_COMMIT"
         echo
         echo "Please sync your branches:"
-        echo "  git push origin $BRANCH_NAME  # if local is ahead"
-        echo "  git pull origin $BRANCH_NAME  # if remote is ahead"
+        echo "  git push origin $GIT_BRANCH_NAME  # if local is ahead"
+        echo "  git pull origin $GIT_BRANCH_NAME  # if remote is ahead"
         exit 1
     fi
     
@@ -1096,9 +1099,9 @@ generate_dashboard_content() {
             # Get branch name from container label
             branch=$(docker inspect --format='{{index .Config.Labels "com.docker.compose.project"}}' "$container" | sed 's/^nr-//')
             
-            # Determine if this is a Claude branch
+            # Determine if this is a Claude branch (sanitized name starts with claude-)
             is_claude="false"
-            if [[ "$branch" == claude/* ]]; then
+            if [[ "$branch" == claude-* ]]; then
                 is_claude="true"
             fi
             
@@ -1106,7 +1109,7 @@ generate_dashboard_content() {
             issue_id=""
             if [[ "$branch" =~ ^issue-([0-9]+)$ ]]; then
                 issue_id="${BASH_REMATCH[1]}"
-            elif [[ "$branch" =~ ^claude/issue-([0-9]+) ]]; then
+            elif [[ "$branch" =~ ^claude-issue-([0-9]+) ]]; then
                 issue_id="${BASH_REMATCH[1]}"
             fi
             
@@ -1178,8 +1181,8 @@ cleanup_old_claude_experiments() {
             # Get branch name from container label
             local branch=$(docker inspect --format='{{index .Config.Labels "com.docker.compose.project"}}' "$container" | sed 's/^nr-//')
             
-            # Check if it's a Claude branch
-            if [[ "$branch" == claude/* ]]; then
+            # Check if it's a Claude branch (sanitized name starts with claude-)
+            if [[ "$branch" == claude-* ]]; then
                 # Get container creation time
                 local created=$(docker inspect --format='{{.State.StartedAt}}' "$container")
                 local created_timestamp=$(date -d "$created" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "${created%%.*}" +%s 2>/dev/null || echo "0")
@@ -1230,8 +1233,8 @@ notify_issue_removal() {
     local reason=$2  # "TTL_EXPIRED" or "MANUAL_CLEANUP"
     local age_days=$3
     
-    # Extract issue number from branch name (claude/issue-XX-...)
-    if [[ "$branch" =~ claude/issue-([0-9]+) ]]; then
+    # Extract issue number from branch name (claude-issue-XX-...)
+    if [[ "$branch" =~ claude-issue-([0-9]+) ]]; then
         local issue_number="${BASH_REMATCH[1]}"
         
         # Prepare message based on reason
@@ -1259,7 +1262,7 @@ notify_deployment_success() {
     local branch=$BRANCH_NAME
     
     # Only notify for Claude branches
-    if [[ "$branch" =~ ^claude/issue-([0-9]+) ]]; then
+    if [[ "$branch" =~ ^claude-issue-([0-9]+) ]]; then
         local issue_number="${BASH_REMATCH[1]}"
         
         # Only notify if GITHUB_TOKEN is available
@@ -1515,6 +1518,7 @@ deploy_remote() {
     # Pass all required variables as environment variables to remote script
     ssh -i "$HETZNER_SSH_KEY" "$HETZNER_USER@$HETZNER_HOST" \
         "export BRANCH_NAME='$BRANCH_NAME' && \
+         export GIT_BRANCH_NAME='$GIT_BRANCH_NAME' && \
          export TS_AUTHKEY='$TS_AUTHKEY' && \
          export TALLY_TOKEN='$TALLY_TOKEN' && \
          export TAILNET='$TAILNET_TO_PASS' && \
@@ -1593,7 +1597,7 @@ deploy_remote_execution() {
         if [ -d "$REPO_DIR/.git" ]; then
             log "Repository exists, updating..."
             cd "$REPO_DIR"
-            if git fetch origin && git checkout "$BRANCH_NAME" && git reset --hard "origin/$BRANCH_NAME"; then
+            if git fetch origin && git checkout "${GIT_BRANCH_NAME:-$BRANCH_NAME}" && git reset --hard "origin/${GIT_BRANCH_NAME:-$BRANCH_NAME}"; then
                 GIT_SUCCESS=true
             else
                 log "${RED}Failed to update existing repository${NC}"
@@ -1607,10 +1611,10 @@ deploy_remote_execution() {
             log "Cloning repository..."
             if git clone "$GIT_REMOTE" "$REPO_DIR"; then
                 cd "$REPO_DIR"
-                if git checkout "$BRANCH_NAME"; then
+                if git checkout "${GIT_BRANCH_NAME:-$BRANCH_NAME}"; then
                     GIT_SUCCESS=true
                 else
-                    log "${RED}Failed to checkout branch $BRANCH_NAME${NC}"
+                    log "${RED}Failed to checkout branch ${GIT_BRANCH_NAME:-$BRANCH_NAME}${NC}"
                 fi
             else
                 log "${RED}Failed to clone repository${NC}"
