@@ -606,6 +606,7 @@ jobs:
     permissions:
       contents: write # Required to push to gh-pages branch
       issues: write # Required to post comments on issues
+      pull-requests: write # Required to post comments on PRs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -680,7 +681,7 @@ jobs:
           CURRENT_BRANCH="${{ github.ref_name }}"
 
           # Build comparison comment with branch information
-          COMMENT_BODY="## 📸 Visual Comparison\n\n**Branch:** \`${CURRENT_BRANCH}\`\n**Workflow Run:** [#${{ github.run_id }}](https://github.com/${REPO_OWNER}/${REPO_NAME}/actions/runs/${{ github.run_id }})\n\n"
+          COMMENT_BODY="## 📸 Visual Comparison\n\n**Branch:** \`${CURRENT_BRANCH}\`\n**Workflow Run:** [#${{ github.run_id }}](https://github.com/${REPO_OWNER}/${REPO_NAME}/actions/runs/${{ github.run_id }})\n\n<details>\n<summary>📷 Click to view screenshots</summary>\n\n"
 
           # Check for screenshot pairs across different numbering and resolution patterns
           SCREENSHOTS_FOUND=false
@@ -712,7 +713,7 @@ jobs:
                   SECTION_FOUND=true
                 fi
                 
-                SECTION_BODY="${SECTION_BODY}| ${RES_NAME} | ![Before ${i} ${RES_SUFFIX}](${IMAGE_BASE_URL}/before-${i}-${RES_SUFFIX}.png) | ![After ${i} ${RES_SUFFIX}](${IMAGE_BASE_URL}/after-${i}-${RES_SUFFIX}.png) |\n"
+                SECTION_BODY="${SECTION_BODY}| ${RES_NAME} | <img src=\"${IMAGE_BASE_URL}/before-${i}-${RES_SUFFIX}.png\" alt=\"Before ${i} ${RES_SUFFIX}\" style=\"max-height: 400px; width: auto;\"> | <img src=\"${IMAGE_BASE_URL}/after-${i}-${RES_SUFFIX}.png\" alt=\"After ${i} ${RES_SUFFIX}\" style=\"max-height: 400px; width: auto;\"> |\n"
                 SCREENSHOTS_FOUND=true
                 echo "Found screenshot pair: ${i}-${RES_SUFFIX}"
               fi
@@ -725,6 +726,9 @@ jobs:
 
           # Post comment if screenshots were found
           if [ "$SCREENSHOTS_FOUND" = true ]; then
+            # Close the details section
+            COMMENT_BODY="${COMMENT_BODY}\n</details>"
+            
             echo "✅ Posting comparison comment to issue #${ISSUE_NUMBER}"
             
             curl -X POST \
@@ -739,18 +743,21 @@ jobs:
             ls -la "${ISSUE_NUMBER}/${RUN_ID}/" || echo "Screenshot directory not found"
             
             # Post fallback comment indicating implementation completion
-            FALLBACK_COMMENT="## 🔧 Implementation Complete\\n\\nChanges have been implemented for this issue.\\n\\n⚠️ Screenshots were not generated in the expected format, but the implementation has been completed. You can check the [workflow run](https://github.com/${REPO_OWNER}/${REPO_NAME}/actions/runs/${{ github.run_id }}) for implementation details.\\n\\n### Available Files\\n"
+            FALLBACK_COMMENT="## 🔧 Implementation Complete\\n\\nChanges have been implemented for this issue.\\n\\n⚠️ Screenshots were not generated in the expected format, but the implementation has been completed. You can check the [workflow run](https://github.com/${REPO_OWNER}/${REPO_NAME}/actions/runs/${{ github.run_id }}) for implementation details.\\n\\n<details>\\n<summary>📷 Available Files</summary>\\n\\n"
             
             # List any files that were deployed
             if [ -d "${ISSUE_NUMBER}/${RUN_ID}" ]; then
-              FALLBACK_COMMENT="${FALLBACK_COMMENT}\\nFiles found in deployment:\\n"
+              FALLBACK_COMMENT="${FALLBACK_COMMENT}Files found in deployment:\\n\\n"
               for file in "${ISSUE_NUMBER}/${RUN_ID}"/*.png; do
                 if [ -f "$file" ]; then
                   filename=$(basename "$file")
-                  FALLBACK_COMMENT="${FALLBACK_COMMENT}- ![${filename}](${IMAGE_BASE_URL}/${filename})\\n"
+                  FALLBACK_COMMENT="${FALLBACK_COMMENT}<img src=\\\"${IMAGE_BASE_URL}/${filename}\\\" alt=\\\"${filename}\\\" style=\\\"max-height: 400px; width: auto; display: block; margin: 10px 0;\\\">\\n\\n"
                 fi
               done
             fi
+            
+            # Close details section
+            FALLBACK_COMMENT="${FALLBACK_COMMENT}\\n</details>"
             
             echo "📝 Posting fallback comment about implementation completion"
             curl -X POST \
