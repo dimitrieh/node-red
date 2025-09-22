@@ -848,6 +848,17 @@ generate_dashboard_html() {
         .info-value { color: #333; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; text-align: right; flex: 1; margin-left: 10px; word-break: break-all; }
         .info-value a { color: #0066cc; text-decoration: none; transition: color 0.2s ease; }
         .info-value a:hover { color: #8f0000; text-decoration: underline; }
+        .experiments-section { margin-bottom: 30px; }
+        .section-title { font-size: 1.5rem; margin-bottom: 10px; color: #333; }
+        .section-description { color: #666; margin-bottom: 20px; font-size: 1rem; }
+        .section-divider { margin: 40px 0; border: none; border-top: 2px dashed #e0e0e0; }
+        .claude-section { background: #f8f9fa; padding: 20px; border-radius: 8px; }
+        .ttl-indicator { margin-top: 10px; padding: 8px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107; }
+        .ttl-indicator.ttl-expiring { background: #f8d7da; border-color: #f5c6cb; }
+        .ttl-label { color: #856404; font-size: 0.9em; }
+        .ttl-indicator.ttl-expiring .ttl-label { color: #721c24; }
+        .ttl-value { font-weight: bold; color: #856404; }
+        .ttl-indicator.ttl-expiring .ttl-value { color: #d73502; }
         @media (max-width: 900px) {
             .controls { flex-direction: column; align-items: stretch; }
             .meta-info { width: 100%; text-align: center; }
@@ -943,7 +954,38 @@ generate_dashboard_html() {
                 container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #666; font-size: 1.2rem; margin: 50px 0;">No containers match the current filter</div>';
                 return;
             }
-            container.innerHTML = filteredContainers.map(cont => createContainerCard(cont)).join('');
+            
+            // Separate Claude and manual experiments
+            const claudeExperiments = filteredContainers.filter(c => c.is_claude === true);
+            const manualExperiments = filteredContainers.filter(c => c.is_claude !== true);
+            
+            let html = '';
+            
+            // Manual experiments section
+            if (manualExperiments.length > 0) {
+                html += '<div class="experiments-section">';
+                html += '<h2 class="section-title">Manual Experiments</h2>';
+                html += '<div class="instances-grid">';
+                html += manualExperiments.map(cont => createContainerCard(cont)).join('');
+                html += '</div></div>';
+            }
+            
+            // Divider between sections
+            if (manualExperiments.length > 0 && claudeExperiments.length > 0) {
+                html += '<hr class="section-divider">';
+            }
+            
+            // Claude experiments section
+            if (claudeExperiments.length > 0) {
+                html += '<div class="experiments-section claude-section">';
+                html += `<h2 class="section-title">Auto-Generated Experiments (${claudeExperiments.length})</h2>`;
+                html += '<p class="section-description">These experiments are automatically created by Claude from GitHub issues and will be removed after 7 days</p>';
+                html += '<div class="instances-grid">';
+                html += claudeExperiments.map(cont => createContainerCard(cont, true)).join('');
+                html += '</div></div>';
+            }
+            
+            container.innerHTML = html;
             container.querySelectorAll('.instance-card').forEach(card => {
                 card.addEventListener('click', function(event) {
                     if (event.target.tagName === 'A' || event.target.closest('a')) { return; }
@@ -952,12 +994,29 @@ generate_dashboard_html() {
                 });
             });
         }
-        function createContainerCard(container) {
+        function createContainerCard(container, isClaudeExperiment = false) {
             const urlStatus = container.urlStatus || 'unknown';
             const statusClass = urlStatus === 'online' ? 'online' : urlStatus === 'checking' ? 'checking' : urlStatus;
             const deployedDate = new Date(container.created);
             const deployedTime = deployedDate.toLocaleString();
             const deployedRelative = getRelativeTime(deployedDate);
+            
+            // Calculate TTL for Claude experiments
+            let ttlIndicator = '';
+            if (isClaudeExperiment) {
+                const now = new Date();
+                const ageInMs = now - deployedDate;
+                const ageInDays = Math.floor(ageInMs / (1000 * 60 * 60 * 24));
+                const remainingDays = Math.max(0, 7 - ageInDays);
+                const ttlClass = remainingDays <= 1 ? 'ttl-expiring' : '';
+                ttlIndicator = `
+                    <div class="ttl-indicator ${ttlClass}">
+                        <span class="ttl-label">Auto-removal in:</span>
+                        <span class="ttl-value">${remainingDays} day${remainingDays !== 1 ? 's' : ''}</span>
+                    </div>
+                `;
+            }
+            
             let versionInfo = '';
             if (container.branch && container.commit && container.branch_url && container.commit_url) {
                 versionInfo = `<a href="${container.branch_url}" target="_blank">${container.branch}</a> | <a href="${container.commit_url}" target="_blank">${container.commit}</a>`;
@@ -993,6 +1052,7 @@ generate_dashboard_html() {
                             <span class="info-label">URL:</span>
                             <span class="info-value"><a href="${container.url}" target="_blank">${container.url}</a></span>
                         </div>
+                        ${ttlIndicator}
                     </div>
                 </div>
             `;
@@ -1051,15 +1111,33 @@ generate_dashboard_content() {
             # Get branch name from container label
             branch=$(docker inspect --format='{{index .Config.Labels "com.docker.compose.project"}}' "$container" | sed 's/^nr-//')
             
+            # Determine if this is a Claude branch
+            is_claude="false"
+            if [[ "$branch" == claude/* ]]; then
+                is_claude="true"
+            fi
+            
             # Extract issue ID from branch name
-            issue_id=$(echo "$branch" | sed -n 's/^issue-\([0-9]\+\)$/\1/p')
+            issue_id=""
+            if [[ "$branch" =~ ^issue-([0-9]+)$ ]]; then
+                issue_id="${BASH_REMATCH[1]}"
+            elif [[ "$branch" =~ ^claude/issue-([0-9]+) ]]; then
+                issue_id="${BASH_REMATCH[1]}"
+            fi
+            
             issue_url=""
             issue_title=""
             
             if [ -n "$issue_id" ]; then
-                issue_url="https://github.com/$GITHUB_ISSUES_REPO/issues/$issue_id"
+                # Use different repo for Claude branches
+                if [ "$is_claude" = "true" ]; then
+                    issue_url="https://github.com/dimitrieh/node-red/issues/$issue_id"
+                    api_url="https://api.github.com/repos/dimitrieh/node-red/issues/$issue_id"
+                else
+                    issue_url="https://github.com/$GITHUB_ISSUES_REPO/issues/$issue_id"
+                    api_url="https://api.github.com/repos/$GITHUB_ISSUES_REPO/issues/$issue_id"
+                fi
                 # Try to fetch issue title
-                api_url="https://api.github.com/repos/$GITHUB_ISSUES_REPO/issues/$issue_id"
                 response=$(curl -s -f "$api_url" 2>/dev/null || echo "{}")
                 issue_title=$(echo "$response" | grep '"title":' | head -1 | sed 's/.*"title": *"\([^"]*\)".*/\1/' | sed 's/\[NR Modernization Experiment\] *//')
             fi
@@ -1081,7 +1159,8 @@ generate_dashboard_content() {
         "branch": "$branch",
         "commit": "$commit_short",
         "commit_url": "$commit_url",
-        "branch_url": "$branch_url"
+        "branch_url": "$branch_url",
+        "is_claude": $is_claude
     }
 CONTAINER_EOF
         done
@@ -1099,6 +1178,95 @@ CONTAINER_EOF
     
     # Generate dashboard HTML
     generate_dashboard_html
+}
+
+# Function to cleanup old Claude experiments (7-day TTL)
+cleanup_old_claude_experiments() {
+    log "Checking for expired Claude experiments..."
+    
+    # Find all containers with the nr-experiment label
+    local containers=$(docker ps -q --filter "label=nr-experiment=true" 2>/dev/null || true)
+    local removed_count=0
+    
+    if [ -n "$containers" ]; then
+        for container in $containers; do
+            # Get branch name from container label
+            local branch=$(docker inspect --format='{{index .Config.Labels "com.docker.compose.project"}}' "$container" | sed 's/^nr-//')
+            
+            # Check if it's a Claude branch
+            if [[ "$branch" == claude/* ]]; then
+                # Get container creation time
+                local created=$(docker inspect --format='{{.State.StartedAt}}' "$container")
+                local created_timestamp=$(date -d "$created" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S" "${created%%.*}" +%s 2>/dev/null || echo "0")
+                local current_timestamp=$(date +%s)
+                
+                # Calculate age in days
+                local age_seconds=$((current_timestamp - created_timestamp))
+                local age_days=$((age_seconds / 86400))
+                
+                # Check if older than 7 days
+                if [ "$age_days" -gt 7 ]; then
+                    log "Removing expired Claude experiment: $branch (${age_days} days old)"
+                    
+                    # Navigate to deployment directory
+                    local deployment_dir="$HOME/node-red-deployments-$branch"
+                    if [ -d "$deployment_dir" ]; then
+                        cd "$deployment_dir"
+                        
+                        # Stop and remove containers
+                        docker compose down 2>/dev/null || true
+                        
+                        # Notify GitHub issue about removal (if GITHUB_TOKEN is available)
+                        if [ -n "${GITHUB_TOKEN:-}" ]; then
+                            notify_issue_removal "$branch" "TTL_EXPIRED" "$age_days"
+                        fi
+                        
+                        # Remove deployment directory
+                        cd ~
+                        rm -rf "$deployment_dir"
+                        
+                        removed_count=$((removed_count + 1))
+                    fi
+                fi
+            fi
+        done
+    fi
+    
+    if [ "$removed_count" -gt 0 ]; then
+        log "Removed $removed_count expired Claude experiment(s)"
+    else
+        log "No expired Claude experiments found"
+    fi
+}
+
+# Function to notify GitHub issue about experiment removal
+notify_issue_removal() {
+    local branch=$1
+    local reason=$2  # "TTL_EXPIRED" or "MANUAL_CLEANUP"
+    local age_days=$3
+    
+    # Extract issue number from branch name (claude/issue-XX-...)
+    if [[ "$branch" =~ claude/issue-([0-9]+) ]]; then
+        local issue_number="${BASH_REMATCH[1]}"
+        
+        # Prepare message based on reason
+        local message=""
+        if [ "$reason" = "TTL_EXPIRED" ]; then
+            message="**Experiment Auto-Removed**\n\nThis experiment has been automatically removed after ${age_days} days (7-day TTL exceeded)."
+        else
+            message="**Experiment Manually Removed**\n\nThis experiment has been manually removed after ${age_days} days of runtime."
+        fi
+        
+        # Post to GitHub issue
+        local api_url="https://api.github.com/repos/dimitrieh/node-red/issues/${issue_number}/comments"
+        local body="{\"body\": \"${message}\\n\\n_Branch: \\\`${branch}\\\`_\\n_Removed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')_\"}"
+        
+        curl -s -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "$api_url" \
+            -d "$body" 2>/dev/null || log "Failed to notify issue #${issue_number} about removal"
+    fi
 }
 
 # Function to prepare and copy all dashboard files to volumes
@@ -1474,6 +1642,9 @@ deploy_remote_execution() {
             exit 1
         fi
         
+        # Cleanup old Claude experiments after successful deployment
+        cleanup_old_claude_experiments
+        
         # Deploy dashboard if dashboard config exists
         if [ -f "docker-compose-dashboard.yml" ]; then
             log "${BLUE}Generating and deploying dashboard...${NC}"
@@ -1596,6 +1767,13 @@ deploy_remote_execution() {
             env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" docker compose -f docker-compose.yml "$@"
         fi
     fi
+    
+    # Clean up sensitive data from bash history
+    log "${BLUE}🧹 Cleaning up sensitive data from history...${NC}"
+    sed -i '/TS_AUTHKEY/d' ~/.bash_history 2>/dev/null || true
+    sed -i '/TALLY_TOKEN/d' ~/.bash_history 2>/dev/null || true
+    history -c 2>/dev/null || true
+    log "${GREEN}✅ History cleaned${NC}"
     
     log "${GREEN}=== Remote script completed ===${NC}"
 }
