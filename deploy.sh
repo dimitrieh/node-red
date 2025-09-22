@@ -1281,11 +1281,63 @@ notify_deployment_success() {
             local deployment_url="https://nr-${branch}.${TAILNET}.ts.net"
             local dashboard_url="https://dashboard.${TAILNET}.ts.net"
             
-            local message="**Experiment Deployed**\\n\\nYour Node-RED experiment is now live at:\\n${deployment_url}\\n\\nView all experiments: ${dashboard_url}\\n\\nThis deployment will automatically expire in 7 days."
+            # Reconstruct original branch name for GitHub API and PR URL
+            local original_branch="${GIT_BRANCH_NAME:-}"
+            if [ -z "$original_branch" ]; then
+                # If GIT_BRANCH_NAME not available, reconstruct from sanitized name
+                original_branch=$(echo "$branch" | sed 's/^claude-/claude\//')
+            fi
+            
+            # Check if PR already exists for this branch
+            local pr_section=""
+            local pr_api_url="https://api.github.com/repos/dimitrieh/node-red/pulls?head=dimitrieh:${original_branch}&state=all"
+            
+            if pr_response=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+                             -H "Accept: application/vnd.github.v3+json" \
+                             "$pr_api_url" 2>&1); then
+                
+                # Check if we have jq available (should be in GitHub Actions)
+                if command -v jq >/dev/null 2>&1; then
+                    local pr_count=$(echo "$pr_response" | jq '. | length' 2>/dev/null || echo "0")
+                    
+                    if [ "$pr_count" -gt "0" ]; then
+                        # PR exists, get details of the first (most recent) one
+                        local pr_number=$(echo "$pr_response" | jq -r '.[0].number' 2>/dev/null)
+                        local pr_url=$(echo "$pr_response" | jq -r '.[0].html_url' 2>/dev/null)
+                        local pr_state=$(echo "$pr_response" | jq -r '.[0].state' 2>/dev/null)
+                        local pr_merged=$(echo "$pr_response" | jq -r '.[0].merged' 2>/dev/null)
+                        
+                        if [ "$pr_state" = "open" ]; then
+                            pr_section="\\n\\n---\\n\\n**Pull Request:** [#${pr_number}](${pr_url}) (Open)"
+                        elif [ "$pr_merged" = "true" ]; then
+                            pr_section="\\n\\n---\\n\\n**Previous Pull Request:** [#${pr_number}](${pr_url}) (Merged)\\n\\n**Create new PR via URL:**\\nhttps://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1"
+                        else
+                            pr_section="\\n\\n---\\n\\n**Previous Pull Request:** [#${pr_number}](${pr_url}) (Closed)\\n\\n**Create new PR via URL:**\\nhttps://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1"
+                        fi
+                    else
+                        # No PR exists, suggest creating one
+                        pr_section="\\n\\n---\\n\\n**Create PR via URL (Avoids fork detection)**\\n\\nGo directly to:\\nhttps://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1\\n\\nThis URL pattern keeps it within your repo."
+                    fi
+                else
+                    # jq not available, fallback to simple grep check
+                    if echo "$pr_response" | grep -q '"number"'; then
+                        # At least one PR exists, but can't parse details
+                        pr_section="\\n\\n---\\n\\n**Note:** A pull request may already exist for this branch. Check: https://github.com/dimitrieh/node-red/pulls?q=head:${original_branch}"
+                    else
+                        # Likely no PR exists
+                        pr_section="\\n\\n---\\n\\n**Create PR via URL (Avoids fork detection)**\\n\\nGo directly to:\\nhttps://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1\\n\\nThis URL pattern keeps it within your repo."
+                    fi
+                fi
+            else
+                # API call failed, provide fallback
+                pr_section="\\n\\n---\\n\\n**Create PR via URL (Avoids fork detection)**\\n\\nGo directly to:\\nhttps://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1\\n\\nThis URL pattern keeps it within your repo."
+            fi
+            
+            local message="**Experiment Deployed**\\n\\nYour Node-RED experiment is now live at:\\n${deployment_url}\\n\\nView all experiments: ${dashboard_url}\\n\\nThis deployment will automatically expire in 7 days.${pr_section}"
             
             # Post deployment notification
             local api_url="https://api.github.com/repos/dimitrieh/node-red/issues/${issue_number}/comments"
-            local body="{\"body\": \"${message}\\n\\n_Branch: \\\`${branch}\\\`_\\n_Deployed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')_\"}"
+            local body="{\"body\": \"${message}\\n\\n---\\n\\n_Branch: \\\`${branch}\\\`_\\n_Deployed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')_\"}"
             
             if response=$(curl -s -X POST \
                 -H "Authorization: token $GITHUB_TOKEN" \
