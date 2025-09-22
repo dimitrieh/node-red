@@ -970,11 +970,8 @@ generate_dashboard_html() {
                 // When we have Claude experiments, show sections
                 let html = '';
                 
-                // Manual experiments section
+                // Manual experiments (without header)
                 if (manualExperiments.length > 0) {
-                    html += '<div class="experiments-section">';
-                    html += '<h2 class="section-title">Manual Experiments</h2>';
-                    html += '</div>';
                     html += manualExperiments.map(cont => createContainerCard(cont)).join('');
                 }
                 
