@@ -1242,14 +1242,32 @@ notify_issue_removal() {
         # Prepare message based on reason
         local message=""
         if [ "$reason" = "TTL_EXPIRED" ]; then
-            message="**Experiment Auto-Removed**\\n\\nThis experiment has been automatically removed after ${age_days} days (7-day TTL exceeded)."
+            message="**Experiment Auto-Removed**
+
+This experiment has been automatically removed after ${age_days} days (7-day TTL exceeded)."
         else
-            message="**Experiment Manually Removed**\\n\\nThis experiment has been manually removed after ${age_days} days of runtime."
+            message="**Experiment Manually Removed**
+
+This experiment has been manually removed after ${age_days} days of runtime."
         fi
+        
+        # Add metadata to message
+        local full_message="${message}
+
+_Branch: \`${branch}\`_
+_Removed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')_"
         
         # Post to GitHub issue
         local api_url="https://api.github.com/repos/dimitrieh/node-red/issues/${issue_number}/comments"
-        local body="{\"body\": \"${message}\\n\\n_Branch: \\\`${branch}\\\`_\\n_Removed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')_\"}"
+        
+        # Use jq to properly escape the JSON if available, otherwise use printf
+        if command -v jq >/dev/null 2>&1; then
+            local body=$(echo "$full_message" | jq -R -s '{body: .}')
+        else
+            # Fallback: manually escape
+            local escaped_message=$(printf '%s' "$full_message" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r/\\r/g; s/\t/\\t/g')
+            local body="{\"body\": \"${escaped_message}\"}"
+        fi
         
         if response=$(curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
@@ -1308,36 +1326,108 @@ notify_deployment_success() {
                         local pr_merged=$(echo "$pr_response" | jq -r '.[0].merged' 2>/dev/null)
                         
                         if [ "$pr_state" = "open" ]; then
-                            pr_section="\\n\\n---\\n\\n**Pull Request:** [#${pr_number}](${pr_url}) (Open)"
+                            pr_section="
+
+---
+
+**Pull Request:** [#${pr_number}](${pr_url}) (Open)"
                         elif [ "$pr_merged" = "true" ]; then
-                            pr_section="\\n\\n---\\n\\n**Previous Pull Request:** [#${pr_number}](${pr_url}) (Merged)\\n\\n**Create new PR via URL:**\\nhttps://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1"
+                            pr_section="
+
+---
+
+**Previous Pull Request:** [#${pr_number}](${pr_url}) (Merged)
+
+**Create new PR via URL:**
+https://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1"
                         else
-                            pr_section="\\n\\n---\\n\\n**Previous Pull Request:** [#${pr_number}](${pr_url}) (Closed)\\n\\n**Create new PR via URL:**\\nhttps://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1"
+                            pr_section="
+
+---
+
+**Previous Pull Request:** [#${pr_number}](${pr_url}) (Closed)
+
+**Create new PR via URL:**
+https://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1"
                         fi
                     else
                         # No PR exists, suggest creating one
-                        pr_section="\\n\\n---\\n\\n**Create PR via URL (Avoids fork detection)**\\n\\nGo directly to:\\nhttps://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1\\n\\nThis URL pattern keeps it within your repo."
+                        pr_section="
+
+---
+
+**Create PR via URL (Avoids fork detection)**
+
+Go directly to:
+https://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1
+
+This URL pattern keeps it within your repo."
                     fi
                 else
                     # jq not available, fallback to simple grep check
                     if echo "$pr_response" | grep -q '"number"'; then
                         # At least one PR exists, but can't parse details
-                        pr_section="\\n\\n---\\n\\n**Note:** A pull request may already exist for this branch. Check: https://github.com/dimitrieh/node-red/pulls?q=head:${original_branch}"
+                        pr_section="
+
+---
+
+**Note:** A pull request may already exist for this branch. Check: https://github.com/dimitrieh/node-red/pulls?q=head:${original_branch}"
                     else
                         # Likely no PR exists
-                        pr_section="\\n\\n---\\n\\n**Create PR via URL (Avoids fork detection)**\\n\\nGo directly to:\\nhttps://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1\\n\\nThis URL pattern keeps it within your repo."
+                        pr_section="
+
+---
+
+**Create PR via URL (Avoids fork detection)**
+
+Go directly to:
+https://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1
+
+This URL pattern keeps it within your repo."
                     fi
                 fi
             else
                 # API call failed, provide fallback
-                pr_section="\\n\\n---\\n\\n**Create PR via URL (Avoids fork detection)**\\n\\nGo directly to:\\nhttps://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1\\n\\nThis URL pattern keeps it within your repo."
+                pr_section="
+
+---
+
+**Create PR via URL (Avoids fork detection)**
+
+Go directly to:
+https://github.com/dimitrieh/node-red/compare/experiment-template...${original_branch}?expand=1
+
+This URL pattern keeps it within your repo."
             fi
             
-            local message="**Experiment Deployed**\\n\\nYour Node-RED experiment is now live at:\\n${deployment_url}\\n\\nView all experiments: ${dashboard_url}\\n\\nThis deployment will automatically expire in 7 days.${pr_section}"
+            local message="**Experiment Deployed**
+
+Your Node-RED experiment is now live at:
+${deployment_url}
+
+View all experiments: ${dashboard_url}
+
+This deployment will automatically expire in 7 days.${pr_section}"
+            
+            # Add metadata to message
+            local full_message="${message}
+
+---
+
+_Branch: \`${branch}\`_
+_Deployed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')_"
             
             # Post deployment notification
             local api_url="https://api.github.com/repos/dimitrieh/node-red/issues/${issue_number}/comments"
-            local body="{\"body\": \"${message}\\n\\n---\\n\\n_Branch: \\\`${branch}\\\`_\\n_Deployed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')_\"}"
+            
+            # Use jq to properly escape the JSON if available, otherwise use printf
+            if command -v jq >/dev/null 2>&1; then
+                local body=$(echo "$full_message" | jq -R -s '{body: .}')
+            else
+                # Fallback: manually escape using printf
+                local escaped_message=$(printf '%s' "$full_message" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r/\\r/g; s/\t/\\t/g')
+                local body="{\"body\": \"${escaped_message}\"}"
+            fi
             
             if response=$(curl -s -X POST \
                 -H "Authorization: token $GITHUB_TOKEN" \
