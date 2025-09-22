@@ -982,7 +982,7 @@ generate_dashboard_html() {
                 
                 // Claude experiments header (inline, not taking grid space)
                 if (claudeExperiments.length > 0) {
-                    html += `<div style="grid-column: 1/-1; margin: 20px 0 10px;">
+                    html += `<div style="grid-column: 1/-1;">
                         <h2 class="section-title">Auto-Generated Experiments (${claudeExperiments.length})</h2>
                         <p class="section-description">The experiments below are auto-generated and may have unintended changes. Mostly for quickly checking generated results.</p>
                     </div>`;
