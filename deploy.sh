@@ -1269,6 +1269,36 @@ notify_issue_removal() {
     fi
 }
 
+# Function to notify GitHub issue about successful deployment
+notify_deployment_success() {
+    local branch=$BRANCH_NAME
+    
+    # Only notify for Claude branches
+    if [[ "$branch" =~ ^claude/issue-([0-9]+) ]]; then
+        local issue_number="${BASH_REMATCH[1]}"
+        
+        # Only notify if GITHUB_TOKEN is available
+        if [ -n "${GITHUB_TOKEN:-}" ]; then
+            local deployment_url="https://nr-${branch}.${TAILNET}.ts.net"
+            local dashboard_url="https://dashboard.${TAILNET}.ts.net"
+            
+            local message="**Experiment Deployed**\n\nYour Node-RED experiment is now live at:\n${deployment_url}\n\nView all experiments: ${dashboard_url}\n\nThis deployment will automatically expire in 7 days."
+            
+            # Post deployment notification
+            local api_url="https://api.github.com/repos/dimitrieh/node-red/issues/${issue_number}/comments"
+            local body="{\"body\": \"${message}\\n\\n_Branch: \\\`${branch}\\\`_\\n_Deployed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')_\"}"
+            
+            curl -s -X POST \
+                -H "Authorization: token $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "$api_url" \
+                -d "$body" 2>/dev/null || log "Failed to notify issue #${issue_number} about deployment"
+            
+            log "${GREEN}✅ Notified issue #${issue_number} about deployment${NC}"
+        fi
+    fi
+}
+
 # Function to prepare and copy all dashboard files to volumes
 prepare_and_copy_dashboard_files() {
     log "Preparing and copying dashboard files to volumes..."
@@ -1642,7 +1672,7 @@ deploy_remote_execution() {
             exit 1
         fi
         
-        # Cleanup old Claude experiments after successful deployment
+        # Cleanup old Claude experiments (after deployment, before dashboard)
         cleanup_old_claude_experiments
         
         # Deploy dashboard if dashboard config exists
@@ -1668,8 +1698,14 @@ deploy_remote_execution() {
             cleanup_dashboard_files
             
             log "${GREEN}✅ Dashboard deployed successfully${NC}"
+            
+            # Notify GitHub issue about deployment (after dashboard is ready)
+            notify_deployment_success
         else
             log "${YELLOW}⚠️  docker-compose-dashboard.yml not found, skipping dashboard deployment${NC}"
+            
+            # Still notify even if no dashboard
+            notify_deployment_success
         fi
         
     else
