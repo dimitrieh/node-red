@@ -856,6 +856,7 @@ generate_dashboard_html() {
         .info-label { color: #666; font-weight: 600; }
         .info-value { color: #333; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; text-align: right; flex: 1; margin-left: 10px; word-break: break-all; }
         .info-value a { color: #0066cc; text-decoration: none; transition: color 0.2s ease; }
+        .info-value code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; color: #8f0000; font-weight: 500; }
         .info-value a:hover { color: #8f0000; text-decoration: underline; }
         .experiments-section { margin-bottom: 30px; }
         .section-title { font-size: 1.5rem; margin-bottom: 10px; color: #333; }
