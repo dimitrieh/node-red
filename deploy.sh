@@ -224,7 +224,13 @@ get_container_git_info() {
     local commit_short="unknown"
     local commit_hash="unknown"
     local commit_url=""
-    local branch_url="https://github.com/$github_repo/tree/$branch"
+    # Reconstruct original branch name for GitHub URL (convert sanitized back to original)
+    local original_branch="$branch"
+    if [[ "$branch" == claude-* ]]; then
+        # Convert claude-issue-XX to claude/issue-XX for GitHub URL
+        original_branch=$(echo "$branch" | sed 's/^claude-/claude\//g')
+    fi
+    local branch_url="https://github.com/$github_repo/tree/$original_branch"
     
     # Check if branch_repo_dir exists and is a valid git repository
     if [ -d "$branch_repo_dir/.git" ]; then
@@ -977,12 +983,8 @@ generate_dashboard_html() {
                     html += '<hr class="section-divider" style="grid-column: 1/-1;">';
                 }
                 
-                // Claude experiments section header
+                // Claude experiments (without separate header div)
                 if (claudeExperiments.length > 0) {
-                    html += '<div class="experiments-section claude-section" style="grid-column: 1/-1;">';
-                    html += `<h2 class="section-title">Auto-Generated Experiments (${claudeExperiments.length})</h2>`;
-                    html += '<p class="section-description">The experiments below are auto-generated and may have unintended changes. Mostly for quickly checking generated results.</p>';
-                    html += '</div>';
                     html += claudeExperiments.map(cont => createContainerCard(cont, true)).join('');
                 }
                 
@@ -1521,6 +1523,7 @@ deploy_remote() {
          export GIT_BRANCH_NAME='$GIT_BRANCH_NAME' && \
          export TS_AUTHKEY='$TS_AUTHKEY' && \
          export TALLY_TOKEN='$TALLY_TOKEN' && \
+         export GITHUB_TOKEN='$GITHUB_TOKEN' && \
          export TAILNET='$TAILNET_TO_PASS' && \
          export GIT_REMOTE='$GIT_REMOTE' && \
          export GITHUB_REPO='$GITHUB_REPO' && \
