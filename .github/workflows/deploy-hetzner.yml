@@ -47,6 +47,7 @@ jobs:
     outputs:
       branch_valid: ${{ steps.validate.outputs.valid }}
       validation_message: ${{ steps.validate.outputs.message }}
+      needs_rebase: ${{ steps.validate.outputs.needs_rebase }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -76,6 +77,7 @@ jobs:
           if ! git show-ref --verify --quiet "refs/remotes/origin/$BRANCH_NAME"; then
             echo "::error::Branch '$BRANCH_NAME' does not exist on remote"
             echo "valid=false" >> "$GITHUB_OUTPUT"
+            echo "needs_rebase=false" >> "$GITHUB_OUTPUT"
             echo "message=Branch '$BRANCH_NAME' does not exist on remote" >> "$GITHUB_OUTPUT"
             echo "::endgroup::"
             exit 0
@@ -85,6 +87,7 @@ jobs:
           if ! git show-ref --verify --quiet "refs/remotes/origin/$BASE_BRANCH"; then
             echo "::error::Base branch '$BASE_BRANCH' does not exist on remote"
             echo "valid=false" >> "$GITHUB_OUTPUT"
+            echo "needs_rebase=false" >> "$GITHUB_OUTPUT"
             echo "message=Base branch '$BASE_BRANCH' does not exist on remote" >> "$GITHUB_OUTPUT"
             echo "::endgroup::"
             exit 0
@@ -102,10 +105,11 @@ jobs:
           
           # Check if base branch is ancestor of target branch
           if ! git merge-base --is-ancestor "$BASE_COMMIT" "$BRANCH_COMMIT"; then
-            echo "::error::Branch '$BRANCH_NAME' is not rebased on latest '$BASE_BRANCH'"
-            echo "::notice::Please rebase: git rebase origin/$BASE_BRANCH"
+            echo "::warning::Branch '$BRANCH_NAME' is not rebased on latest '$BASE_BRANCH'"
+            echo "::notice::Branch needs automatic rebase"
             echo "valid=false" >> "$GITHUB_OUTPUT"
-            echo "message=Branch '$BRANCH_NAME' is not rebased on latest '$BASE_BRANCH'. Please run: git rebase origin/$BASE_BRANCH" >> "$GITHUB_OUTPUT"
+            echo "needs_rebase=true" >> "$GITHUB_OUTPUT"
+            echo "message=Branch '$BRANCH_NAME' needs rebase on latest '$BASE_BRANCH'. Attempting automatic rebase..." >> "$GITHUB_OUTPUT"
             echo "::endgroup::"
             exit 0
           fi
@@ -135,6 +139,7 @@ jobs:
           echo "::endgroup::"
           
           echo "valid=true" >> "$GITHUB_OUTPUT"
+          echo "needs_rebase=false" >> "$GITHUB_OUTPUT"
           echo "message=Branch '$BRANCH_NAME' is properly rebased and ready for deployment" >> "$GITHUB_OUTPUT"
 
       - name: Display validation result
@@ -343,10 +348,106 @@ jobs:
             shred -u ~/.ssh/id_rsa 2>/dev/null || rm -f ~/.ssh/id_rsa
           fi
 
+  auto-rebase:
+    name: Automatic Rebase
+    needs: validate-branch
+    if: needs.validate-branch.outputs.needs_rebase == 'true' && (github.event.inputs.action == 'deploy' || github.event_name == 'push')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ github.token }}
+          
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+      - name: Perform automatic rebase and trigger deployment
+        env:
+          BRANCH_NAME: ${{ github.event.inputs.branch || github.ref_name }}
+          BASE_BRANCH: experiment-template
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          
+          echo "::group::🔄 Performing automatic rebase"
+          echo "📋 Branch: $BRANCH_NAME"
+          echo "📍 Base: $BASE_BRANCH"
+          
+          # Fetch latest changes
+          git fetch --all --prune
+          
+          # Checkout the branch
+          git checkout "$BRANCH_NAME"
+          
+          # Attempt rebase
+          if git rebase "origin/$BASE_BRANCH"; then
+            echo "✅ Rebase successful - no conflicts"
+            
+            # Push the rebased branch using the default GITHUB_TOKEN
+            echo "::notice::Pushing rebased branch..."
+            git push --force-with-lease origin "$BRANCH_NAME"
+            echo "::notice::✅ Branch rebased and pushed successfully"
+            
+            # Wait a moment for the push to be processed
+            sleep 3
+            
+            # Now trigger the deployment workflow using workflow_dispatch
+            echo "::notice::Triggering deployment workflow..."
+            
+            # Use gh CLI to trigger the workflow (this bypasses the GITHUB_TOKEN push limitation)
+            if gh workflow run deploy-hetzner.yml \
+              --ref "$BRANCH_NAME" \
+              -f branch="$BRANCH_NAME" \
+              -f action=deploy; then
+              
+              echo "::notice::✅ Deployment workflow triggered for rebased branch"
+              echo ""
+              echo "📋 Branch: $BRANCH_NAME"
+              echo "🚀 Action: deploy"
+              echo ""
+              echo "Check the Actions tab for the new workflow run:"
+              echo "https://github.com/${{ github.repository }}/actions/workflows/deploy-hetzner.yml"
+            else
+              echo "::warning::Failed to trigger deployment workflow automatically"
+              echo "::notice::Branch was rebased successfully, but you'll need to manually trigger deployment"
+              echo "::notice::Go to: https://github.com/${{ github.repository }}/actions/workflows/deploy-hetzner.yml"
+            fi
+          else
+            echo "::error::❌ Rebase failed due to conflicts"
+            echo "::notice::Manual intervention required. Run these commands locally:"
+            echo ""
+            echo "git fetch origin"
+            echo "git checkout $BRANCH_NAME"
+            echo "git rebase origin/$BASE_BRANCH"
+            echo "# Resolve conflicts, then:"
+            echo "git rebase --continue"
+            echo "git push --force-with-lease origin $BRANCH_NAME"
+            exit 1
+          fi
+          
+          echo "::endgroup::"
+          
+      - name: Create job summary
+        if: success()
+        run: |
+          {
+            echo "## 🔄 Automatic Rebase Completed"
+            echo ""
+            echo "✅ **SUCCESS**: Branch \`${{ github.event.inputs.branch || github.ref_name }}\` has been rebased on \`experiment-template\`"
+            echo ""
+            echo "The branch has been pushed and a new deployment workflow will start automatically."
+            echo ""
+            echo "**Timestamp**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   validation-failed:
     name: Branch Validation Failed
     needs: validate-branch
-    if: needs.validate-branch.outputs.branch_valid != 'true' && (github.event.inputs.action == 'deploy' || github.event_name == 'push')
+    if: needs.validate-branch.outputs.branch_valid != 'true' && needs.validate-branch.outputs.needs_rebase != 'true' && (github.event.inputs.action == 'deploy' || github.event_name == 'push')
     runs-on: ubuntu-latest
     steps:
       - name: Display validation failure
