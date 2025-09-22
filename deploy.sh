@@ -1326,11 +1326,52 @@ notify_deployment_success() {
                         local pr_merged=$(echo "$pr_response" | jq -r '.[0].merged' 2>/dev/null)
                         
                         if [ "$pr_state" = "open" ]; then
-                            pr_section="
+                            # If there's an open PR, post to PR instead of issue
+                            log "${GREEN}✅ Open PR #${pr_number} exists - posting to PR instead of issue${NC}"
+                            log "${CYAN}📋 PR URL: ${pr_url}${NC}"
+                            
+                            # Post deployment notification to PR
+                            local pr_message="**Experiment Deployed**
+
+Your Node-RED experiment is now live at:
+${deployment_url}
+
+View all experiments: ${dashboard_url}
+
+This deployment will automatically expire in 7 days.
 
 ---
 
-**Pull Request:** [#${pr_number}](${pr_url}) (Open)"
+_Branch: \`${branch}\`_
+_Deployed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')_"
+                            
+                            local pr_comment_url="https://api.github.com/repos/dimitrieh/node-red/issues/${pr_number}/comments"
+                            
+                            # Use jq to properly escape the JSON if available, otherwise use printf
+                            if command -v jq >/dev/null 2>&1; then
+                                local body=$(echo "$pr_message" | jq -R -s '{body: .}')
+                            else
+                                # Fallback: manually escape using printf
+                                local escaped_message=$(printf '%s' "$pr_message" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\n/\\n/g; s/\r/\\r/g; s/\t/\\t/g')
+                                local body="{\"body\": \"${escaped_message}\"}"
+                            fi
+                            
+                            if response=$(curl -s -X POST \
+                                -H "Authorization: token $GITHUB_TOKEN" \
+                                -H "Accept: application/vnd.github.v3+json" \
+                                "$pr_comment_url" \
+                                -d "$body" 2>&1); then
+                                # Check if response contains an error
+                                if echo "$response" | grep -q '"message"'; then
+                                    log "${YELLOW}⚠️  Failed to notify PR #${pr_number}: $(echo "$response" | grep '"message"' | head -1)${NC}"
+                                else
+                                    log "${GREEN}✅ Notified PR #${pr_number} about deployment${NC}"
+                                fi
+                            else
+                                log "${YELLOW}⚠️  Failed to notify PR #${pr_number} about deployment${NC}"
+                            fi
+                            
+                            return 0
                         elif [ "$pr_merged" = "true" ]; then
                             pr_section="
 
