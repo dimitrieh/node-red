@@ -153,8 +153,23 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: nr-experiments
-      url: https://nr-${{ github.event.inputs.branch || github.ref_name }}.${{ vars.TAILNET }}.ts.net
+      url: ${{ steps.branch-name.outputs.deployment_url }}
     steps:
+      - name: Sanitize branch name for URL
+        id: branch-name
+        run: |
+          # Get the branch name
+          BRANCH="${{ github.event.inputs.branch || github.ref_name }}"
+          # Use the SAME sanitization as deploy.sh (line 671)
+          # Replace all non-alphanumeric characters with hyphens and convert to lowercase
+          SANITIZED_BRANCH=$(echo "$BRANCH" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "sanitized=$SANITIZED_BRANCH" >> $GITHUB_OUTPUT
+          echo "deployment_url=https://nr-${SANITIZED_BRANCH}.${{ vars.TAILNET }}.ts.net" >> $GITHUB_OUTPUT
+          echo "📋 Branch: $BRANCH"
+          echo "🔗 Sanitized: $SANITIZED_BRANCH"
+          echo "🌐 URL: https://nr-${SANITIZED_BRANCH}.${{ vars.TAILNET }}.ts.net"
+      
       - name: Checkout repository
         uses: actions/checkout@v4
 
