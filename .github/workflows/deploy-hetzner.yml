@@ -151,7 +151,9 @@ jobs:
     needs: validate-branch
     if: needs.validate-branch.outputs.branch_valid == 'true' && (github.event.inputs.action == 'deploy' || github.event_name == 'push')
     runs-on: ubuntu-latest
-    environment: nr-experiments
+    environment:
+      name: nr-experiments
+      url: https://nr-${{ github.event.inputs.branch || github.ref_name }}.${{ vars.TAILNET }}.ts.net
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
