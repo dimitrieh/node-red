@@ -853,7 +853,7 @@ generate_dashboard_html() {
         .status-checking { background: #e3f2fd; color: #2196F3; }
         .instance-info { margin-bottom: 20px; }
         .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; }
-        .info-label { color: #666; font-weight: 500; }
+        .info-label { color: #666; font-weight: 600; }
         .info-value { color: #333; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; text-align: right; flex: 1; margin-left: 10px; word-break: break-all; }
         .info-value a { color: #0066cc; text-decoration: none; transition: color 0.2s ease; }
         .info-value a:hover { color: #8f0000; text-decoration: underline; }
@@ -919,7 +919,7 @@ generate_dashboard_html() {
                 const generatedDate = new Date(containersData.generated);
                 const generated = generatedDate.toLocaleString();
                 const relativeTime = getRelativeTime(generatedDate);
-                metaInfo.innerHTML = `Generated: <code>${relativeTime}</code> (${generated})`;
+                metaInfo.innerHTML = `<span style="font-weight: 600;">Generated:</span> <code>${relativeTime}</code> (${generated})`;
                 containersData.containers.forEach(container => { container.urlStatus = 'checking'; });
                 displayContainers();
                 updateStats();
