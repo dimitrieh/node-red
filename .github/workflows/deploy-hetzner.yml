@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'issue-*'
+      - 'claude/*'
       - 'experiment-*'
       - 'experiment-template'
   workflow_dispatch:
@@ -176,6 +177,7 @@ jobs:
           TALLY_TOKEN: ${{ secrets.TALLY_TOKEN }}
           GITHUB_REPO: ${{ env.GITHUB_REPO }}
           GITHUB_ISSUES_REPO: ${{ env.GITHUB_ISSUES_REPO }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH_NAME: ${{ github.event.inputs.branch || github.ref_name }}
         run: |
           set -euo pipefail
@@ -209,6 +211,30 @@ jobs:
             echo "- **Branch**: \`$BRANCH_NAME\`"
             echo "- **Timestamp**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post deployment notification to GitHub issue
+        if: startsWith(github.ref_name, 'claude/issue-')
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ github.event.inputs.branch || github.ref_name }}
+          TAILNET: ${{ vars.TAILNET }}
+        run: |
+          # Extract issue number from branch name
+          if [[ "$BRANCH_NAME" =~ claude/issue-([0-9]+) ]]; then
+            ISSUE_NUMBER="${BASH_REMATCH[1]}"
+            DEPLOYMENT_URL="https://nr-${BRANCH_NAME}.${TAILNET}.ts.net"
+            DASHBOARD_URL="https://dashboard.${TAILNET}.ts.net"
+            
+            # Post deployment notification
+            COMMENT_BODY="**Experiment Deployed**\\n\\nYour Node-RED experiment is now live at:\\n${DEPLOYMENT_URL}\\n\\nView all experiments: ${DASHBOARD_URL}\\n\\nThis deployment will automatically expire in 7 days.\\n\\n_Branch: \`${BRANCH_NAME}\`_\\n_Deployed: $(date -u '+%Y-%m-%d %H:%M:%S UTC')_"
+            
+            curl -X POST \
+              -H "Authorization: token ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/dimitrieh/node-red/issues/${ISSUE_NUMBER}/comments" \
+              -d "{\"body\":\"${COMMENT_BODY}\"}" 2>/dev/null || echo "Failed to notify issue #${ISSUE_NUMBER}"
+          fi
 
       - name: Cleanup SSH key
         if: always()
@@ -258,6 +284,7 @@ jobs:
           TALLY_TOKEN: ${{ secrets.TALLY_TOKEN }}
           GITHUB_REPO: ${{ env.GITHUB_REPO }}
           GITHUB_ISSUES_REPO: ${{ env.GITHUB_ISSUES_REPO }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BRANCH_NAME: ${{ github.event.inputs.branch || github.ref_name }}
           ACTION: ${{ github.event.inputs.action }}
         run: |
