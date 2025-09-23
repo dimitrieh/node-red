@@ -9,6 +9,9 @@ services:
       - FLOWS=flows.json
       - BRANCH_NAME=BRANCH_PLACEHOLDER
       - TALLY_SURVEY_ID=${TALLY_SURVEY_ID:-}
+      - TALLY_ISSUE_NUMBER=${TALLY_ISSUE_NUMBER:-}
+      - TALLY_BRANCH_NAME=${TALLY_BRANCH_NAME:-}
+      - TALLY_COMMIT=${TALLY_COMMIT:-}
     deploy:
       resources:
         limits:
