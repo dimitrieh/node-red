@@ -876,7 +876,7 @@ generate_dashboard_html() {
         .info-value a { color: #0066cc; text-decoration: none; transition: color 0.2s ease; }
         .info-value code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; color: #8f0000; font-weight: 500; }
         .info-value a:hover { color: #8f0000; text-decoration: underline; }
-        .experiment-link { display: inline-block; margin-top: auto; padding: 8px 16px; background: white; color: #8f0000; text-decoration: none; border-radius: 4px; font-size: 0.9rem; cursor: pointer; transition: all 0.3s ease; border: 2px solid #8f0000; }
+        .experiment-link { display: inline-block; margin-top: auto; padding: 8px 16px; background: white; color: #8f0000; text-decoration: none; border-radius: 4px; font-size: 0.9rem; cursor: pointer; transition: all 0.3s ease; border: 2px solid #8f0000; align-self: flex-start; }
         .experiment-link:hover { background: #8f0000; color: white; }
         .details-toggle { cursor: pointer; color: #666; padding: 8px 0; font-size: 0.9rem; user-select: none; font-weight: normal; }
         .details-toggle:hover { color: #333; text-decoration: underline; }
