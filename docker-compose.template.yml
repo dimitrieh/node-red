@@ -8,6 +8,7 @@ services:
       - NODE_PATH=/usr/src/node-red/node_modules
       - FLOWS=flows.json
       - BRANCH_NAME=BRANCH_PLACEHOLDER
+      - EXPERIMENT_TITLE=${EXPERIMENT_TITLE:-}
       - TALLY_SURVEY_ID=${TALLY_SURVEY_ID:-}
       - TALLY_ISSUE_NUMBER=${TALLY_ISSUE_NUMBER:-}
       - TALLY_BRANCH_NAME=${TALLY_BRANCH_NAME:-}
