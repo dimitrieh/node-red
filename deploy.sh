@@ -1116,7 +1116,7 @@ generate_dashboard_html() {
                 <div class="instance-card grouped-card ${statusClass}">
                     <div class="instance-card-content">
                         <div class="instance-header">
-                            <h3 class="instance-name">${group.issue_title ? group.issue_title.replace(/^\[NR Modernization Experiment\]\s*/, '') : 'Multiple Experiments'}</h3>
+                            <h3 class="instance-name">${group.issue_title && group.issue_title.trim() ? group.issue_title.replace(/^\[NR Modernization Experiment\]\s*/, '') : 'Multiple Experiments'}</h3>
                             <span class="status-badge status-${statusText}">${statusText}</span>
                         </div>
                         ${experimentItems}
@@ -1136,7 +1136,7 @@ generate_dashboard_html() {
                 <div class="instance-card ${statusClass}" data-url="${container.url}">
                     <div class="instance-card-content">
                         <div class="instance-header">
-                            <h3 class="instance-name">${container.issue_title ? container.issue_title.replace(/^\[NR Modernization Experiment\]\s*/, '') : container.name.replace(/^claude-/, '')}</h3>
+                            <h3 class="instance-name">${container.issue_title && container.issue_title.trim() ? container.issue_title.replace(/^\[NR Modernization Experiment\]\s*/, '') : container.name.replace(/^claude-/, '')}</h3>
                             <span class="status-badge status-${urlStatus}">${urlStatus}</span>
                         </div>
                         <div class="instance-info">
@@ -1323,7 +1323,7 @@ generate_dashboard_content() {
         "created": "$created",
         "url": "https://$name.${TAILNET}.ts.net",
         "issue_url": "$issue_url",
-        "issue_title": "$issue_title",
+        "issue_title": $(if [ -n "$issue_title" ]; then echo "\"$issue_title\""; else echo "null"; fi),
         "pr_urls": $pr_urls,
         "pr_numbers": "$pr_list",
         "branch": "$original_branch",
