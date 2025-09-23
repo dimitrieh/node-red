@@ -1143,7 +1143,7 @@ generate_dashboard_content() {
                 fi
                 # Try to fetch issue title
                 response=$(curl -s -f "$api_url" 2>/dev/null || echo "{}")
-                issue_title=$(echo "$response" | grep '"title":' | head -1 | sed 's/.*"title": *"\([^"]*\)".*/\1/' | sed 's/\[NR Modernization Experiment\] *//')
+                issue_title=$(echo "$response" | { grep '"title":' || true; } | head -1 | sed 's/.*"title": *"\([^"]*\)".*/\1/' | sed 's/\[NR Modernization Experiment\] *//')
             fi
             
             # Check for associated PRs on dimitrieh/node-red for this branch
@@ -1163,7 +1163,7 @@ generate_dashboard_content() {
             pr_response="[${pr_response}$(echo "$pr_response_closed" | sed 's/\]$//' | sed 's/^\[//')]"
             
             # Extract all PR numbers and create JSON array
-            pr_numbers=$(echo "$pr_response" | grep '"number":' | sed 's/.*"number": *\([0-9]*\).*/\1/' | tr '\n' ' ')
+            pr_numbers=$(echo "$pr_response" | { grep '"number":' || true; } | sed 's/.*"number": *\([0-9]*\).*/\1/' | tr '\n' ' ')
             pr_urls="["
             pr_list=""
             most_recent_pr_number=""
@@ -1172,7 +1172,7 @@ generate_dashboard_content() {
             if [ -n "$pr_numbers" ]; then
                 # The first PR in the list is the most recent (open if any, otherwise most recent closed)
                 most_recent_pr_number=$(echo "$pr_numbers" | awk '{print $1}')
-                most_recent_pr_title=$(echo "$pr_response" | grep -m1 '"title":' | sed 's/.*"title": *"\([^"]*\)".*/\1/')
+                most_recent_pr_title=$(echo "$pr_response" | { grep -m1 '"title":' || true; } | sed 's/.*"title": *"\([^"]*\)".*/\1/')
                 
                 for pr_num in $pr_numbers; do
                     if [ -n "$pr_list" ]; then
