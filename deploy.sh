@@ -860,13 +860,19 @@ generate_dashboard_html() {
         .info-value a { color: #0066cc; text-decoration: none; transition: color 0.2s ease; }
         .info-value code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; color: #8f0000; font-weight: 500; }
         .info-value a:hover { color: #8f0000; text-decoration: underline; }
-        .experiment-link-bar { background: #8f0000; color: white; padding: 15px; text-align: center; font-weight: 600; font-size: 1rem; letter-spacing: 0.5px; transition: background 0.3s ease; border-radius: 0 0 8px 8px; }
+        .experiment-link-bar { background: #8f0000; color: white; padding: 15px; text-align: center; font-weight: 600; font-size: 1rem; letter-spacing: 0.5px; transition: background 0.3s ease; border-radius: 0 0 8px 8px; cursor: pointer; }
         .instance-card:hover .experiment-link-bar { background: #a70000; }
-        .experiments-section { margin-bottom: 30px; }
-        .section-title { font-size: 1.5rem; margin-bottom: 10px; color: #333; }
-        .section-description { color: #666; margin-bottom: 20px; font-size: 1rem; }
-        .section-divider { margin: 40px 0; border: none; border-top: 2px dashed #e0e0e0; }
-        .claude-section { background: #f8f9fa; padding: 20px; border-radius: 8px; }
+        .details-toggle { cursor: pointer; color: #0066cc; padding: 8px 0; font-size: 0.9rem; user-select: none; font-weight: 500; }
+        .details-toggle:hover { color: #8f0000; text-decoration: underline; }
+        .details-content { display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; margin: 8px 0; }
+        .details-content.expanded { display: block; }
+        .auto-generated-label { color: #666; font-size: 0.85rem; font-weight: normal; font-style: italic; }
+        .grouped-card .image-header { padding: 15px 0; border-bottom: 1px solid #e0e0e0; }
+        .experiment-item { padding: 20px 0; border-bottom: 1px solid #e0e0e0; }
+        .experiment-item:last-child { border-bottom: none; }
+        .experiment-name { font-weight: 600; font-size: 1.1rem; margin-bottom: 8px; color: #333; }
+        .experiment-sub-link { display: inline-block; margin-top: 10px; padding: 8px 16px; background: #8f0000; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9rem; cursor: pointer; transition: background 0.3s ease; }
+        .experiment-sub-link:hover { background: #a70000; }
         @media (max-width: 900px) {
             .controls { flex-direction: column; align-items: stretch; }
             .meta-info { width: 100%; text-align: center; }
@@ -954,6 +960,40 @@ generate_dashboard_html() {
             displayContainers();
             updateStats();
         }
+        function groupContainersByIssue(containers) {
+            const grouped = {};
+            const ungrouped = [];
+            
+            containers.forEach(container => {
+                if (container.issue_url) {
+                    if (!grouped[container.issue_url]) {
+                        grouped[container.issue_url] = {
+                            issue_url: container.issue_url,
+                            issue_title: container.issue_title,
+                            experiments: []
+                        };
+                    }
+                    grouped[container.issue_url].experiments.push(container);
+                } else {
+                    ungrouped.push(container);
+                }
+            });
+            
+            // Convert to array and only include groups with multiple experiments
+            const groupedArray = [];
+            const singleIssues = [];
+            
+            Object.values(grouped).forEach(group => {
+                if (group.experiments.length > 1) {
+                    groupedArray.push(group);
+                } else {
+                    singleIssues.push(group.experiments[0]);
+                }
+            });
+            
+            return { grouped: groupedArray, ungrouped: [...ungrouped, ...singleIssues] };
+        }
+        
         function displayContainers() {
             if (!containersData) return;
             const container = document.getElementById('instances');
@@ -963,68 +1003,92 @@ generate_dashboard_html() {
                 return;
             }
             
-            // Separate Claude and manual experiments
-            const claudeExperiments = filteredContainers.filter(c => c.is_claude === true);
-            const manualExperiments = filteredContainers.filter(c => c.is_claude !== true);
+            // Group containers by issue
+            const { grouped, ungrouped } = groupContainersByIssue(filteredContainers);
             
-            // For manual experiments only, use the original simple grid
-            if (claudeExperiments.length === 0) {
-                // Original behavior - all cards in main grid
-                container.innerHTML = filteredContainers.map(cont => createContainerCard(cont)).join('');
-            } else {
-                // When we have Claude experiments, show sections
-                let html = '';
-                
-                // Manual experiments (without header)
-                if (manualExperiments.length > 0) {
-                    html += manualExperiments.map(cont => createContainerCard(cont)).join('');
-                }
-                
-                // Divider between sections
-                if (manualExperiments.length > 0 && claudeExperiments.length > 0) {
-                    html += '<hr class="section-divider" style="grid-column: 1/-1;">';
-                }
-                
-                // Claude experiments header (inline, not taking grid space)
-                if (claudeExperiments.length > 0) {
-                    html += `<div style="grid-column: 1/-1;">
-                        <h2 class="section-title">Auto-Generated Experiments (${claudeExperiments.length})</h2>
-                        <p class="section-description">The experiments below are auto-generated and may have unintended changes. Mostly for quickly checking generated results.</p>
-                    </div>`;
-                    html += claudeExperiments.map(cont => createContainerCard(cont, true)).join('');
-                }
-                
-                container.innerHTML = html;
-            }
+            let html = '';
+            
+            // Display grouped experiments
+            grouped.forEach(group => {
+                html += createGroupedCard(group);
+            });
+            
+            // Display ungrouped experiments
+            ungrouped.forEach(cont => {
+                html += createContainerCard(cont);
+            });
+            
+            container.innerHTML = html;
+            
+            // Add click handlers
             container.querySelectorAll('.instance-card').forEach(card => {
                 card.addEventListener('click', function(event) {
-                    if (event.target.tagName === 'A' || event.target.closest('a')) { return; }
+                    if (event.target.tagName === 'A' || event.target.closest('a') || 
+                        event.target.closest('.details-toggle') || event.target.closest('.experiment-link-bar')) { 
+                        return; 
+                    }
                     const url = this.getAttribute('data-url');
-                    window.open(url, '_blank');
+                    if (url) window.open(url, '_blank');
+                });
+            });
+            
+            // Add details toggle handlers
+            container.querySelectorAll('.details-toggle').forEach(toggle => {
+                toggle.addEventListener('click', function(event) {
+                    event.stopPropagation();
+                    const targetId = this.getAttribute('data-target');
+                    const details = document.getElementById(targetId);
+                    if (details) {
+                        details.classList.toggle('expanded');
+                        this.textContent = details.classList.contains('expanded') ? '▼ Details' : '▶ Details';
+                    }
+                });
+            });
+            
+            // Add experiment link handlers
+            container.querySelectorAll('.experiment-link-bar, .experiment-sub-link').forEach(link => {
+                link.addEventListener('click', function(event) {
+                    event.stopPropagation();
+                    const url = this.getAttribute('data-url');
+                    if (url) window.open(url, '_blank');
                 });
             });
         }
-        function createContainerCard(container, isClaudeExperiment = false) {
-            const urlStatus = container.urlStatus || 'unknown';
-            const statusClass = urlStatus === 'online' ? 'online' : urlStatus === 'checking' ? 'checking' : urlStatus;
-            const deployedDate = new Date(container.created);
-            const deployedTime = deployedDate.toLocaleString();
-            const deployedRelative = getRelativeTime(deployedDate);
+        function createGroupedCard(group) {
+            // Get overall status (online if any is online)
+            const hasOnline = group.experiments.some(e => e.urlStatus === 'online');
+            const statusClass = hasOnline ? 'online' : group.experiments.some(e => e.urlStatus === 'checking') ? 'checking' : 'offline';
+            const statusText = hasOnline ? 'online' : group.experiments.some(e => e.urlStatus === 'checking') ? 'checking' : 'offline';
             
+            // Use first experiment's image (they should all be the same)
+            const image = group.experiments[0].image;
             
-            return `
-                <div class="instance-card ${statusClass}" data-url="${container.url}">
-                    <div class="instance-card-content">
-                        <div class="instance-header">
-                            <h3 class="instance-name">${container.issue_title ? container.issue_title.replace(/^\[NR Modernization Experiment\]\s*/, '') : container.name}</h3>
-                            <span class="status-badge status-${urlStatus}">${urlStatus}</span>
+            // Build experiment items HTML
+            let experimentItems = '';
+            group.experiments.forEach(container => {
+                const deployedDate = new Date(container.created);
+                const deployedTime = deployedDate.toLocaleString();
+                const deployedRelative = getRelativeTime(deployedDate);
+                const containerId = 'details-' + Math.random().toString(36).substr(2, 9);
+                const autoGenLabel = container.is_claude ? ' <span class="auto-generated-label" title="Auto-generated experiment that may have unintended changes. Mostly for quickly checking generated results.">(auto-generated)</span>' : '';
+                
+                experimentItems += `
+                    <div class="experiment-item">
+                        <div class="experiment-name">${container.branch.replace(/^claude\//, '')}${autoGenLabel}</div>
+                        ${container.pr_urls && container.pr_urls.length > 0 ? `
+                        <div class="info-row">
+                            <span class="info-label">PR${container.pr_urls.length > 1 ? 's' : ''}:</span>
+                            <span class="info-value">${container.pr_urls.map(pr_url => 
+                                `<a href="${pr_url}" target="_blank">#${pr_url.split('/').pop()}</a>`
+                            ).join(', ')}</span>
                         </div>
-                        <div class="instance-info">
+                        ` : ''}
+                        <div class="details-toggle" data-target="${containerId}">▶ Details</div>
+                        <div id="${containerId}" class="details-content">
                             <div class="info-row">
                                 <span class="info-label">Deployed:</span>
                                 <span class="info-value" title="${deployedTime}">${deployedRelative}</span>
                             </div>
-                            ${container.branch && container.commit ? `
                             <div class="info-row">
                                 <span class="info-label">Branch:</span>
                                 <span class="info-value"><a href="${container.branch_url}" target="_blank">${container.branch.replace(/^claude\//, '')}</a></span>
@@ -1033,11 +1097,48 @@ generate_dashboard_html() {
                                 <span class="info-label">Commit:</span>
                                 <span class="info-value"><a href="${container.commit_url}" target="_blank">${container.commit}</a></span>
                             </div>
-                            ` : ''}
+                        </div>
+                        <div class="experiment-sub-link" data-url="${container.url}">Open live experiment</div>
+                    </div>
+                `;
+            });
+            
+            return `
+                <div class="instance-card grouped-card ${statusClass}">
+                    <div class="instance-card-content">
+                        <div class="instance-header">
+                            <h3 class="instance-name">${group.issue_title ? group.issue_title.replace(/^\[NR Modernization Experiment\]\s*/, '') : 'Multiple Experiments'}</h3>
+                            <span class="status-badge status-${statusText}">${statusText}</span>
+                        </div>
+                        <div class="image-header">
                             <div class="info-row">
                                 <span class="info-label">Image:</span>
-                                <span class="info-value"><code>${container.image}</code></span>
+                                <span class="info-value"><code>${image}</code></span>
                             </div>
+                        </div>
+                        ${experimentItems}
+                    </div>
+                </div>
+            `;
+        }
+        
+        function createContainerCard(container) {
+            const urlStatus = container.urlStatus || 'unknown';
+            const statusClass = urlStatus === 'online' ? 'online' : urlStatus === 'checking' ? 'checking' : urlStatus;
+            const deployedDate = new Date(container.created);
+            const deployedTime = deployedDate.toLocaleString();
+            const deployedRelative = getRelativeTime(deployedDate);
+            const containerId = 'details-' + Math.random().toString(36).substr(2, 9);
+            const autoGenLabel = container.is_claude ? ' <span class="auto-generated-label" title="Auto-generated experiment that may have unintended changes. Mostly for quickly checking generated results.">(auto-generated)</span>' : '';
+            
+            return `
+                <div class="instance-card ${statusClass}" data-url="${container.url}">
+                    <div class="instance-card-content">
+                        <div class="instance-header">
+                            <h3 class="instance-name">${container.issue_title ? container.issue_title.replace(/^\[NR Modernization Experiment\]\s*/, '') : container.name}${autoGenLabel}</h3>
+                            <span class="status-badge status-${urlStatus}">${urlStatus}</span>
+                        </div>
+                        <div class="instance-info">
                             ${container.issue_url ? `
                             <div class="info-row">
                                 <span class="info-label">Issue:</span>
@@ -1052,9 +1153,30 @@ generate_dashboard_html() {
                                 ).join(', ')}</span>
                             </div>
                             ` : ''}
+                            <div class="details-toggle" data-target="${containerId}">▶ Details</div>
+                            <div id="${containerId}" class="details-content">
+                                <div class="info-row">
+                                    <span class="info-label">Deployed:</span>
+                                    <span class="info-value" title="${deployedTime}">${deployedRelative}</span>
+                                </div>
+                                ${container.branch && container.commit ? `
+                                <div class="info-row">
+                                    <span class="info-label">Branch:</span>
+                                    <span class="info-value"><a href="${container.branch_url}" target="_blank">${container.branch.replace(/^claude\//, '')}</a></span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Commit:</span>
+                                    <span class="info-value"><a href="${container.commit_url}" target="_blank">${container.commit}</a></span>
+                                </div>
+                                ` : ''}
+                                <div class="info-row">
+                                    <span class="info-label">Image:</span>
+                                    <span class="info-value"><code>${container.image}</code></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="experiment-link-bar">Open live experiment</div>
+                    <div class="experiment-link-bar" data-url="${container.url}">Open live experiment</div>
                 </div>
             `;
         }
