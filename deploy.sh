@@ -242,7 +242,7 @@ get_container_git_info() {
         fi
     fi
     
-    echo "$commit_short|$commit_hash|$commit_url|$branch_url"
+    echo "$commit_short|$commit_hash|$commit_url|$branch_url|$original_branch"
 }
 
 # Function to ensure Docker is installed and ready
@@ -1334,7 +1334,7 @@ generate_dashboard_content() {
             # Get git info using common function
             branch_repo_dir=~/node-red-deployments-$branch
             git_info=$(get_container_git_info "$branch" "$branch_repo_dir" "$GITHUB_REPO")
-            IFS='|' read -r commit_short commit_hash commit_url branch_url <<< "$git_info"
+            IFS='|' read -r commit_short commit_hash commit_url branch_url original_branch <<< "$git_info"
             
             # Generate container entry
             cat >> containers.json << CONTAINER_EOF
@@ -1347,7 +1347,7 @@ generate_dashboard_content() {
         "issue_title": "$issue_title",
         "pr_urls": $pr_urls,
         "pr_numbers": "$pr_list",
-        "branch": "$branch",
+        "branch": "$original_branch",
         "commit": "$commit_short",
         "commit_url": "$commit_url",
         "branch_url": "$branch_url",
