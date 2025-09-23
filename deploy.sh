@@ -1086,11 +1086,13 @@ generate_dashboard_html() {
                 const deployedTime = deployedDate.toLocaleString();
                 const deployedRelative = getRelativeTime(deployedDate);
                 const containerId = 'details-' + Math.random().toString(36).substr(2, 9);
-                const autoGenBadge = container.is_claude ? '<span class="status-badge status-auto" title="Auto-generated experiment that may have unintended changes. Mostly for quickly checking generated results.">auto</span>' : '';
+                const autoGenBadge = container.is_claude ? ' <span class="status-badge status-auto" title="Auto-generated experiment that may have unintended changes. Mostly for quickly checking generated results.">(auto-generated)</span>' : '';
                 
                 experimentItems += `
                     <div class="experiment-item">
-                        <div class="experiment-name">${container.branch.replace(/^claude\//, '')}${autoGenBadge}</div>
+                        <div class="info-row">
+                            <span class="info-value">${container.branch.replace(/^claude\//, '')}${autoGenBadge}</span>
+                        </div>
                         <div class="info-row">
                             <span class="info-label">Deployed:</span>
                             <span class="info-value" title="${deployedTime}">${deployedRelative}</span>
