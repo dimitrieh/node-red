@@ -583,6 +583,9 @@ setup_issue_survey() {
     if [ -z "$issue_id" ] && [ -z "$experiment_id" ]; then
         log "${BLUE}ℹ️  [TALLY] Branch '$branch' is not an issue or experiment branch, skipping survey setup${NC}"
         export TALLY_SURVEY_ID=""
+        export TALLY_ISSUE_NUMBER=""
+        export TALLY_BRANCH_NAME=""
+        export TALLY_COMMIT=""
         return 0
     fi
     
@@ -625,6 +628,9 @@ setup_issue_survey() {
     if [ -z "$tally_token" ]; then
         log "${YELLOW}⚠️  [TALLY] No Tally token found anywhere, skipping survey setup${NC}"
         export TALLY_SURVEY_ID=""
+        export TALLY_ISSUE_NUMBER=""
+        export TALLY_BRANCH_NAME=""
+        export TALLY_COMMIT=""
         return 0
     fi
     
@@ -648,11 +654,19 @@ setup_issue_survey() {
     
     if [ -n "$survey_id" ]; then
         export TALLY_SURVEY_ID="$survey_id"
+        # Export additional variables for hidden fields
+        export TALLY_ISSUE_NUMBER="$issue_id"
+        export TALLY_BRANCH_NAME="$branch"
+        export TALLY_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo '')"
         log "${GREEN}✅ [TALLY] Survey ready: $survey_name (ID: $survey_id)${NC}"
         log "${GREEN}🎯 [TALLY] TALLY_SURVEY_ID exported: '$TALLY_SURVEY_ID'${NC}"
+        log "${GREEN}🎯 [TALLY] Hidden fields exported: issue=$TALLY_ISSUE_NUMBER, branch=$TALLY_BRANCH_NAME, commit=$TALLY_COMMIT${NC}"
     else
         log "${YELLOW}⚠️  [TALLY] Failed to setup survey, continuing without it${NC}"
         export TALLY_SURVEY_ID=""
+        export TALLY_ISSUE_NUMBER=""
+        export TALLY_BRANCH_NAME=""
+        export TALLY_COMMIT=""
     fi
     
     log "${BLUE}🏁 [TALLY] Survey setup completed for branch: '$branch'${NC}"
@@ -839,7 +853,7 @@ generate_dashboard_html() {
         .filter-btn:hover { background: rgba(143, 0, 0, 0.05); color: #8f0000; }
         .filter-btn.active { background: #8f0000; color: white; }
         .instances-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-top: 20px; }
-        .instance-card { background: white; border-radius: 8px; padding: 0; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; cursor: pointer; position: relative; overflow: hidden; border: 1px solid #e0e0e0; display: flex; flex-direction: column; }
+        .instance-card { background: white; border-radius: 8px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; cursor: pointer; position: relative; overflow: hidden; border: 1px solid #e0e0e0; }
         .instance-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); border-color: #8f0000; }
         .instance-card.online:hover { border-color: #4CAF50; }
         .instance-card.checking:hover { border-color: #2196F3; }
@@ -862,8 +876,8 @@ generate_dashboard_html() {
         .info-value a { color: #0066cc; text-decoration: none; transition: color 0.2s ease; }
         .info-value code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; color: #8f0000; font-weight: 500; }
         .info-value a:hover { color: #8f0000; text-decoration: underline; }
-        .experiment-link-bar { background: white; color: #8f0000; padding: 15px; text-align: center; font-weight: 600; font-size: 1rem; letter-spacing: 0.5px; transition: all 0.3s ease; border-radius: 0 0 8px 8px; cursor: pointer; border: 2px solid #8f0000; border-top: none; margin: 0 -2px -2px -2px; }
-        .experiment-link-bar:hover { background: #8f0000; color: white; }
+        .experiment-link { display: inline-block; margin-top: 10px; padding: 8px 16px; background: white; color: #8f0000; text-decoration: none; border-radius: 4px; font-size: 0.9rem; cursor: pointer; transition: all 0.3s ease; border: 2px solid #8f0000; }
+        .experiment-link:hover { background: #8f0000; color: white; }
         .details-toggle { cursor: pointer; color: #666; padding: 8px 0; font-size: 0.9rem; user-select: none; font-weight: normal; }
         .details-toggle:hover { color: #333; text-decoration: underline; }
         .details-content { display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; margin: 8px 0; }
@@ -1026,7 +1040,7 @@ generate_dashboard_html() {
             container.querySelectorAll('.instance-card').forEach(card => {
                 card.addEventListener('click', function(event) {
                     if (event.target.tagName === 'A' || event.target.closest('a') || 
-                        event.target.closest('.details-toggle') || event.target.closest('.experiment-link-bar')) { 
+                        event.target.closest('.details-toggle') || event.target.closest('.experiment-link') || event.target.closest('.experiment-sub-link')) { 
                         return; 
                     }
                     const url = this.getAttribute('data-url');
@@ -1048,7 +1062,7 @@ generate_dashboard_html() {
             });
             
             // Add experiment link handlers
-            container.querySelectorAll('.experiment-link-bar, .experiment-sub-link').forEach(link => {
+            container.querySelectorAll('.experiment-link, .experiment-sub-link').forEach(link => {
                 link.addEventListener('click', function(event) {
                     event.stopPropagation();
                     const url = this.getAttribute('data-url');
@@ -1177,9 +1191,9 @@ generate_dashboard_html() {
                                     <span class="info-value"><code>${container.image}</code></span>
                                 </div>
                             </div>
+                            <div class="experiment-link" data-url="${container.url}">Open live experiment</div>
                         </div>
                     </div>
-                    <div class="experiment-link-bar" data-url="${container.url}">Open live experiment</div>
                 </div>
             `;
         }
@@ -1786,13 +1800,13 @@ deploy_local() {
     # Run docker-compose
     if [ "$1" = "up" ] || [ "$1" = "" ]; then
         log "Running: docker compose -f $COMPOSE_FILE up -d"
-        env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" docker compose -f "$COMPOSE_FILE" up -d
+        env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" docker compose -f "$COMPOSE_FILE" up -d
         
         # Validate Tailscale connection and retry if needed
         validate_and_retry_tailscale "nr-$BRANCH_NAME-tailscale" "nr_${BRANCH_NAME}_tailscale" "$COMPOSE_FILE" "tailscale"
     else
         log "Running: docker compose -f $COMPOSE_FILE $*"
-        env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" docker compose -f "$COMPOSE_FILE" "$@"
+        env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" docker compose -f "$COMPOSE_FILE" "$@"
     fi
     
     if [ "$1" = "up" ] || [ "$1" = "" ]; then
@@ -2035,7 +2049,7 @@ deploy_remote_execution() {
         
         # Deploy with docker-compose
         log "${BLUE}Deploying with docker-compose...${NC}"
-        if env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" docker compose -f docker-compose.yml up -d; then
+        if env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" docker compose -f docker-compose.yml up -d; then
             log "${GREEN}✅ Main deployment successful${NC}"
             
             # Validate Tailscale connection and retry if needed
@@ -2176,7 +2190,7 @@ deploy_remote_execution() {
         else
             # For other commands
             log "Running: docker compose $@"
-            env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" docker compose -f docker-compose.yml "$@"
+            env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" docker compose -f docker-compose.yml "$@"
         fi
     fi
     
