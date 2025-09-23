@@ -885,7 +885,7 @@ generate_dashboard_html() {
         .badge-container { display: flex; align-items: center; }
         .grouped-card .image-header { padding: 15px 0; border-bottom: 1px solid #e0e0e0; }
         .experiment-item { padding: 20px 0; border-bottom: 1px solid #e0e0e0; }
-        .experiment-item:last-child { border-bottom: none; }
+        .experiment-item:last-child { border-bottom: none; padding-bottom: 0; }
         .experiment-name { font-weight: 600; font-size: 1.1rem; margin-bottom: 8px; color: #333; }
         .experiment-sub-link { display: inline-block; margin-top: 10px; padding: 8px 16px; background: white; color: #8f0000; text-decoration: none; border-radius: 4px; font-size: 0.9rem; cursor: pointer; transition: all 0.3s ease; border: 2px solid #8f0000; }
         .experiment-sub-link:hover { background: #8f0000; color: white; }
@@ -1094,7 +1094,7 @@ generate_dashboard_html() {
                         </div>
                         <div class="info-row">
                             <span class="info-label">Branch:</span>
-                            <span class="info-value">${container.branch.replace(/^claude\//, '')}</span>
+                            <span class="info-value"><a href="${container.branch_url}" target="_blank">${container.branch.replace(/^claude\//, '')}</a></span>
                         </div>
                         <div class="details-toggle" data-target="${containerId}">▶ Details</div>
                         <div id="${containerId}" class="details-content">
@@ -1119,6 +1119,12 @@ generate_dashboard_html() {
                             <h3 class="instance-name">${group.issue_title && group.issue_title.trim() ? group.issue_title.replace(/^\[NR Modernization Experiment\]\s*/, '') : 'Multiple Experiments'}</h3>
                             <span class="status-badge status-${statusText}">${statusText}</span>
                         </div>
+                        ${group.issue_url ? `
+                        <div class="info-row">
+                            <span class="info-label">Issue:</span>
+                            <span class="info-value"><a href="${group.issue_url}" target="_blank">#${group.issue_url.split('/').pop()}</a></span>
+                        </div>
+                        ` : ''}
                         ${experimentItems}
                     </div>
                 </div>
@@ -1172,8 +1178,8 @@ generate_dashboard_html() {
                                 <span class="info-label">Image:</span>
                                 <span class="info-value"><code>${container.image}</code></span>
                             </div>
-                            <div class="experiment-link" data-url="${container.url}">Open live experiment</div>
                         </div>
+                        <div class="experiment-link" data-url="${container.url}">Open live experiment</div>
                     </div>
                 </div>
             `;
@@ -1267,12 +1273,19 @@ generate_dashboard_content() {
             fi
             
             # Check for associated PRs on dimitrieh/node-red for this branch
+            # Convert sanitized branch name back to original for GitHub API
+            github_branch="$branch"
+            if [[ "$branch" == claude-* ]]; then
+                # Convert claude-issue-XX to claude/issue-XX for GitHub API
+                github_branch=$(echo "$branch" | sed 's/^claude-/claude\//g')
+            fi
+            
             # First check open PRs
-            pr_api_url="https://api.github.com/repos/dimitrieh/node-red/pulls?state=open&head=dimitrieh:$branch&sort=created&direction=desc"
+            pr_api_url="https://api.github.com/repos/dimitrieh/node-red/pulls?state=open&head=dimitrieh:$github_branch&sort=created&direction=desc"
             pr_response_open=$(curl -s -f "$pr_api_url" 2>/dev/null || echo "[]")
             
             # Then check closed PRs if needed
-            pr_api_url="https://api.github.com/repos/dimitrieh/node-red/pulls?state=closed&head=dimitrieh:$branch&sort=created&direction=desc"
+            pr_api_url="https://api.github.com/repos/dimitrieh/node-red/pulls?state=closed&head=dimitrieh:$github_branch&sort=created&direction=desc"
             pr_response_closed=$(curl -s -f "$pr_api_url" 2>/dev/null || echo "[]")
             
             # Combine responses (open PRs first, then closed)
