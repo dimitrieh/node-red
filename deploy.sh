@@ -1276,7 +1276,11 @@ generate_dashboard_content() {
                     api_url="https://api.github.com/repos/$GITHUB_ISSUES_REPO/issues/$issue_id"
                 fi
                 # Try to fetch issue title
-                response=$(curl -s -f "$api_url" 2>/dev/null || echo "{}")
+                if [ -n "${GITHUB_TOKEN:-}" ]; then
+                    response=$(curl -s -f -H "Authorization: token $GITHUB_TOKEN" "$api_url" 2>/dev/null || echo "{}")
+                else
+                    response=$(curl -s -f "$api_url" 2>/dev/null || echo "{}")
+                fi
                 # Use jq for proper JSON parsing (jq is installed earlier if needed)
                 if echo "$response" | jq . >/dev/null 2>&1; then
                     issue_title=$(echo "$response" | jq -r '.title // ""' | sed 's/\[NR Modernization Experiment\] *//')
@@ -1296,11 +1300,19 @@ generate_dashboard_content() {
             
             # First check open PRs
             pr_api_url="https://api.github.com/repos/dimitrieh/node-red/pulls?state=open&head=dimitrieh:$github_branch&sort=created&direction=desc"
-            pr_response_open=$(curl -s -f "$pr_api_url" 2>/dev/null || echo "[]")
+            if [ -n "${GITHUB_TOKEN:-}" ]; then
+                pr_response_open=$(curl -s -f -H "Authorization: token $GITHUB_TOKEN" "$pr_api_url" 2>/dev/null || echo "[]")
+            else
+                pr_response_open=$(curl -s -f "$pr_api_url" 2>/dev/null || echo "[]")
+            fi
             
             # Then check closed PRs if needed
             pr_api_url="https://api.github.com/repos/dimitrieh/node-red/pulls?state=closed&head=dimitrieh:$github_branch&sort=created&direction=desc"
-            pr_response_closed=$(curl -s -f "$pr_api_url" 2>/dev/null || echo "[]")
+            if [ -n "${GITHUB_TOKEN:-}" ]; then
+                pr_response_closed=$(curl -s -f -H "Authorization: token $GITHUB_TOKEN" "$pr_api_url" 2>/dev/null || echo "[]")
+            else
+                pr_response_closed=$(curl -s -f "$pr_api_url" 2>/dev/null || echo "[]")
+            fi
             
             # Combine responses (open PRs first, then closed)
             pr_response=$(echo "$pr_response_open" | sed 's/\]$//' | sed 's/^\[//')
