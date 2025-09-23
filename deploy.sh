@@ -860,10 +860,10 @@ generate_dashboard_html() {
         .info-value a { color: #0066cc; text-decoration: none; transition: color 0.2s ease; }
         .info-value code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; color: #8f0000; font-weight: 500; }
         .info-value a:hover { color: #8f0000; text-decoration: underline; }
-        .experiment-link-bar { background: #8f0000; color: white; padding: 15px; text-align: center; font-weight: 600; font-size: 1rem; letter-spacing: 0.5px; transition: background 0.3s ease; border-radius: 0 0 8px 8px; cursor: pointer; }
-        .instance-card:hover .experiment-link-bar { background: #a70000; }
-        .details-toggle { cursor: pointer; color: #0066cc; padding: 8px 0; font-size: 0.9rem; user-select: none; font-weight: 500; }
-        .details-toggle:hover { color: #8f0000; text-decoration: underline; }
+        .experiment-link-bar { background: white; color: #8f0000; padding: 15px; text-align: center; font-weight: 600; font-size: 1rem; letter-spacing: 0.5px; transition: all 0.3s ease; border-radius: 0 0 8px 8px; cursor: pointer; border: 2px solid #8f0000; border-top: none; margin: 0 -2px -2px -2px; }
+        .experiment-link-bar:hover { background: #8f0000; color: white; }
+        .details-toggle { cursor: pointer; color: #666; padding: 8px 0; font-size: 0.9rem; user-select: none; font-weight: normal; }
+        .details-toggle:hover { color: #333; text-decoration: underline; }
         .details-content { display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; margin: 8px 0; }
         .details-content.expanded { display: block; }
         .auto-generated-label { color: #666; font-size: 0.85rem; font-weight: normal; font-style: italic; }
@@ -871,8 +871,8 @@ generate_dashboard_html() {
         .experiment-item { padding: 20px 0; border-bottom: 1px solid #e0e0e0; }
         .experiment-item:last-child { border-bottom: none; }
         .experiment-name { font-weight: 600; font-size: 1.1rem; margin-bottom: 8px; color: #333; }
-        .experiment-sub-link { display: inline-block; margin-top: 10px; padding: 8px 16px; background: #8f0000; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9rem; cursor: pointer; transition: background 0.3s ease; }
-        .experiment-sub-link:hover { background: #a70000; }
+        .experiment-sub-link { display: inline-block; margin-top: 10px; padding: 8px 16px; background: white; color: #8f0000; text-decoration: none; border-radius: 4px; font-size: 0.9rem; cursor: pointer; transition: all 0.3s ease; border: 2px solid #8f0000; }
+        .experiment-sub-link:hover { background: #8f0000; color: white; }
         @media (max-width: 900px) {
             .controls { flex-direction: column; align-items: stretch; }
             .meta-info { width: 100%; text-align: center; }
@@ -1083,12 +1083,12 @@ generate_dashboard_html() {
                             ).join(', ')}</span>
                         </div>
                         ` : ''}
+                        <div class="info-row">
+                            <span class="info-label">Deployed:</span>
+                            <span class="info-value" title="${deployedTime}">${deployedRelative}</span>
+                        </div>
                         <div class="details-toggle" data-target="${containerId}">▶ Details</div>
                         <div id="${containerId}" class="details-content">
-                            <div class="info-row">
-                                <span class="info-label">Deployed:</span>
-                                <span class="info-value" title="${deployedTime}">${deployedRelative}</span>
-                            </div>
                             <div class="info-row">
                                 <span class="info-label">Branch:</span>
                                 <span class="info-value"><a href="${container.branch_url}" target="_blank">${container.branch.replace(/^claude\//, '')}</a></span>
@@ -1153,12 +1153,12 @@ generate_dashboard_html() {
                                 ).join(', ')}</span>
                             </div>
                             ` : ''}
+                            <div class="info-row">
+                                <span class="info-label">Deployed:</span>
+                                <span class="info-value" title="${deployedTime}">${deployedRelative}</span>
+                            </div>
                             <div class="details-toggle" data-target="${containerId}">▶ Details</div>
                             <div id="${containerId}" class="details-content">
-                                <div class="info-row">
-                                    <span class="info-label">Deployed:</span>
-                                    <span class="info-value" title="${deployedTime}">${deployedRelative}</span>
-                                </div>
                                 ${container.branch && container.commit ? `
                                 <div class="info-row">
                                     <span class="info-label">Branch:</span>
