@@ -839,26 +839,29 @@ generate_dashboard_html() {
         .filter-btn:hover { background: rgba(143, 0, 0, 0.05); color: #8f0000; }
         .filter-btn.active { background: #8f0000; color: white; }
         .instances-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-top: 20px; }
-        .instance-card { background: white; border-radius: 8px; padding: 25px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; cursor: pointer; position: relative; overflow: hidden; border: 1px solid #e0e0e0; }
+        .instance-card { background: white; border-radius: 8px; padding: 0; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; cursor: pointer; position: relative; overflow: hidden; border: 1px solid #e0e0e0; display: flex; flex-direction: column; }
         .instance-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); border-color: #8f0000; }
         .instance-card.online:hover { border-color: #4CAF50; }
         .instance-card.checking:hover { border-color: #2196F3; }
-        .instance-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: #4CAF50; }
+        .instance-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: #4CAF50; z-index: 1; }
         .instance-card.checking::before { background: #2196F3; }
         .instance-card.offline::before { background: #f44336; }
+        .instance-card-content { padding: 25px; flex: 1; }
         .instance-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
         .instance-name { font-size: 1.3rem; font-weight: 600; color: #333; margin: 0; }
         .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
         .status-online { background: #e8f5e8; color: #4CAF50; }
         .status-offline { background: #ffebee; color: #f44336; }
         .status-checking { background: #e3f2fd; color: #2196F3; }
-        .instance-info { margin-bottom: 20px; }
+        .instance-info { margin-bottom: 0; }
         .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; }
         .info-label { color: #666; font-weight: 600; }
         .info-value { color: #333; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; text-align: right; flex: 1; margin-left: 10px; word-break: break-all; }
         .info-value a { color: #0066cc; text-decoration: none; transition: color 0.2s ease; }
         .info-value code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; color: #8f0000; font-weight: 500; }
         .info-value a:hover { color: #8f0000; text-decoration: underline; }
+        .experiment-link-bar { background: #8f0000; color: white; padding: 15px; text-align: center; font-weight: 600; font-size: 1rem; letter-spacing: 0.5px; transition: background 0.3s ease; border-radius: 0 0 8px 8px; }
+        .instance-card:hover .experiment-link-bar { background: #a70000; }
         .experiments-section { margin-bottom: 30px; }
         .section-title { font-size: 1.5rem; margin-bottom: 10px; color: #333; }
         .section-description { color: #666; margin-bottom: 20px; font-size: 1rem; }
@@ -1011,48 +1014,47 @@ generate_dashboard_html() {
             
             return `
                 <div class="instance-card ${statusClass}" data-url="${container.url}">
-                    <div class="instance-header">
-                        <h3 class="instance-name">${container.issue_title ? container.issue_title.replace(/^\[NR Modernization Experiment\]\s*/, '') : container.name}</h3>
-                        <span class="status-badge status-${urlStatus}">${urlStatus}</span>
-                    </div>
-                    <div class="instance-info">
-                        <div class="info-row">
-                            <span class="info-label">Deployed:</span>
-                            <span class="info-value" title="${deployedTime}">${deployedRelative}</span>
+                    <div class="instance-card-content">
+                        <div class="instance-header">
+                            <h3 class="instance-name">${container.issue_title ? container.issue_title.replace(/^\[NR Modernization Experiment\]\s*/, '') : container.name}</h3>
+                            <span class="status-badge status-${urlStatus}">${urlStatus}</span>
                         </div>
-                        ${container.branch && container.commit ? `
-                        <div class="info-row">
-                            <span class="info-label">Branch:</span>
-                            <span class="info-value"><a href="${container.branch_url}" target="_blank">${container.branch.replace(/^claude\//, '')}</a></span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">Commit:</span>
-                            <span class="info-value"><a href="${container.commit_url}" target="_blank">${container.commit}</a></span>
-                        </div>
-                        ` : ''}
-                        <div class="info-row">
-                            <span class="info-label">Image:</span>
-                            <span class="info-value"><code>${container.image}</code></span>
-                        </div>
-                        ${container.issue_url ? `
-                        <div class="info-row">
-                            <span class="info-label">Issue:</span>
-                            <span class="info-value"><a href="${container.issue_url}" target="_blank">#${container.issue_url.split('/').pop()}</a></span>
-                        </div>
-                        ` : ''}
-                        ${container.pr_urls && container.pr_urls.length > 0 ? `
-                        <div class="info-row">
-                            <span class="info-label">PR${container.pr_urls.length > 1 ? 's' : ''}:</span>
-                            <span class="info-value">${container.pr_urls.map(pr_url => 
-                                `<a href="${pr_url}" target="_blank">#${pr_url.split('/').pop()}</a>`
-                            ).join(', ')}</span>
-                        </div>
-                        ` : ''}
-                        <div class="info-row">
-                            <span class="info-label">Experiment:</span>
-                            <span class="info-value"><a href="${container.url}" target="_blank">link</a></span>
+                        <div class="instance-info">
+                            <div class="info-row">
+                                <span class="info-label">Deployed:</span>
+                                <span class="info-value" title="${deployedTime}">${deployedRelative}</span>
+                            </div>
+                            ${container.branch && container.commit ? `
+                            <div class="info-row">
+                                <span class="info-label">Branch:</span>
+                                <span class="info-value"><a href="${container.branch_url}" target="_blank">${container.branch.replace(/^claude\//, '')}</a></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Commit:</span>
+                                <span class="info-value"><a href="${container.commit_url}" target="_blank">${container.commit}</a></span>
+                            </div>
+                            ` : ''}
+                            <div class="info-row">
+                                <span class="info-label">Image:</span>
+                                <span class="info-value"><code>${container.image}</code></span>
+                            </div>
+                            ${container.issue_url ? `
+                            <div class="info-row">
+                                <span class="info-label">Issue:</span>
+                                <span class="info-value"><a href="${container.issue_url}" target="_blank">#${container.issue_url.split('/').pop()}</a></span>
+                            </div>
+                            ` : ''}
+                            ${container.pr_urls && container.pr_urls.length > 0 ? `
+                            <div class="info-row">
+                                <span class="info-label">PR${container.pr_urls.length > 1 ? 's' : ''}:</span>
+                                <span class="info-value">${container.pr_urls.map(pr_url => 
+                                    `<a href="${pr_url}" target="_blank">#${pr_url.split('/').pop()}</a>`
+                                ).join(', ')}</span>
+                            </div>
+                            ` : ''}
                         </div>
                     </div>
+                    <div class="experiment-link-bar">Open live experiment</div>
                 </div>
             `;
         }
