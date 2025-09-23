@@ -29,12 +29,9 @@ permissions:
   issues: write  # Required for posting comments to issues
   pull-requests: write  # Required for posting comments to PRs
 
-# Concurrency control to prevent deployment conflicts
-# Only one deployment can run at a time to protect server resources and dashboard integrity
-# Queues deployments instead of canceling them
-concurrency:
-  group: hetzner-deployment
-  cancel-in-progress: false
+# Environment-based queuing
+# The 'nr-experiments' environment handles sequential deployment queuing
+# This ensures deployments run one at a time without cancellations
 
 # Global environment variables
 env:
