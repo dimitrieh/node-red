@@ -3,21 +3,21 @@ name: Deploy to Hetzner
 on:
   push:
     branches:
-      - 'issue-*'
-      - 'claude/*'
-      - 'experiment-*'
-      - 'experiment-template'
+      - "issue-*"
+      - "claude/*"
+      - "experiment-*"
+      - "experiment-template"
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to deploy'
+        description: "Branch to deploy"
         required: true
-        default: 'issue-5254'
+        default: "experiment-template"
         type: string
       action:
-        description: 'Deployment action'
+        description: "Deployment action"
         required: true
-        default: 'deploy'
+        default: "deploy"
         type: choice
         options:
           - deploy
@@ -26,12 +26,8 @@ on:
 
 permissions:
   contents: read
-  issues: write  # Required for posting comments to issues
-  pull-requests: write  # Required for posting comments to PRs
-
-# Environment-based queuing
-# The 'nr-experiments' environment handles sequential deployment queuing
-# This ensures deployments run one at a time without cancellations
+  issues: write # Required for posting comments to issues
+  pull-requests: write # Required for posting comments to PRs
 
 # Global environment variables
 env:
@@ -67,10 +63,10 @@ jobs:
           BASE_BRANCH: experiment-template
         run: |
           set -euo pipefail
-          
+
           echo "::group::🔍 Validating branch: $BRANCH_NAME"
           echo "📋 Base branch: $BASE_BRANCH"
-          
+
           # Check if target branch exists
           if ! git show-ref --verify --quiet "refs/remotes/origin/$BRANCH_NAME"; then
             echo "::error::Branch '$BRANCH_NAME' does not exist on remote"
@@ -80,7 +76,7 @@ jobs:
             echo "::endgroup::"
             exit 0
           fi
-          
+
           # Check if base branch exists
           if ! git show-ref --verify --quiet "refs/remotes/origin/$BASE_BRANCH"; then
             echo "::error::Base branch '$BASE_BRANCH' does not exist on remote"
@@ -90,17 +86,17 @@ jobs:
             echo "::endgroup::"
             exit 0
           fi
-          
+
           # Get latest commits
           git checkout "origin/$BASE_BRANCH"
           BASE_COMMIT=$(git rev-parse HEAD)
-          
+
           git checkout "origin/$BRANCH_NAME"
           BRANCH_COMMIT=$(git rev-parse HEAD)
-          
+
           echo "📍 Base branch ($BASE_BRANCH) latest commit: $BASE_COMMIT"
           echo "📍 Target branch ($BRANCH_NAME) latest commit: $BRANCH_COMMIT"
-          
+
           # Check if base branch is ancestor of target branch
           if ! git merge-base --is-ancestor "$BASE_COMMIT" "$BRANCH_COMMIT"; then
             echo "::warning::Branch '$BRANCH_NAME' is not rebased on latest '$BASE_BRANCH'"
@@ -111,7 +107,7 @@ jobs:
             echo "::endgroup::"
             exit 0
           fi
-          
+
           # Check for merge commits from base branch (indicates merge instead of rebase)
           MERGE_COMMITS=$(git log --oneline --merges "$BASE_COMMIT..$BRANCH_COMMIT" --grep="Merge.*$BASE_BRANCH" | wc -l || echo "0")
           if [ "$MERGE_COMMITS" -gt 0 ]; then
@@ -119,23 +115,23 @@ jobs:
             echo "💡 Consider using rebase instead of merge for cleaner history"
             # Note: This is a warning, not a failure
           fi
-          
+
           # Get the merge base to check how recent the rebase is
           MERGE_BASE=$(git merge-base "origin/$BASE_BRANCH" "origin/$BRANCH_NAME")
           COMMITS_BEHIND=$(git rev-list --count "$MERGE_BASE..origin/$BASE_BRANCH" || echo "0")
-          
+
           if [ "$COMMITS_BEHIND" -gt 0 ]; then
             echo "::warning::Branch '$BRANCH_NAME' is $COMMITS_BEHIND commit(s) behind latest '$BASE_BRANCH'"
             echo "💡 Consider rebasing to include latest changes: git rebase origin/$BASE_BRANCH"
             # Note: This is a warning, not a failure for now
           fi
-          
+
           # All validations passed
           echo "✅ Branch '$BRANCH_NAME' is properly rebased on '$BASE_BRANCH'"
           echo "📊 Commits behind base: $COMMITS_BEHIND"
           echo "🎯 Ready for deployment"
           echo "::endgroup::"
-          
+
           echo "valid=true" >> "$GITHUB_OUTPUT"
           echo "needs_rebase=false" >> "$GITHUB_OUTPUT"
           echo "message=Branch '$BRANCH_NAME' is properly rebased and ready for deployment" >> "$GITHUB_OUTPUT"
@@ -149,9 +145,99 @@ jobs:
             echo "❌ **FAILED**: ${{ steps.validate.outputs.message }}" >> $GITHUB_STEP_SUMMARY
           fi
 
-  deploy:
-    name: Deploy to Hetzner
+  wait-for-queue:
+    name: Wait for Deployment Queue
     needs: validate-branch
+    if: needs.validate-branch.outputs.branch_valid == 'true' && (github.event.inputs.action == 'deploy' || github.event_name == 'push')
+    runs-on: ubuntu-latest
+    outputs:
+      position: ${{ steps.check-queue.outputs.position }}
+    steps:
+      - name: Check queue position and wait
+        id: check-queue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CURRENT_RUN_ID=${{ github.run_id }}
+          WAIT_PER_JOB=120  # 2 minutes per earlier job
+
+          echo "🔍 Current run ID: $CURRENT_RUN_ID"
+          echo "⏱️  Checking for earlier deployments..."
+
+          # Count earlier in-progress or queued runs
+          EARLIER_RUNS=$(gh run list \
+            --repo ${{ github.repository }} \
+            --workflow deploy-hetzner.yml \
+            --limit 100 \
+            --json databaseId,status,headBranch,createdAt \
+            | jq --arg current "$CURRENT_RUN_ID" \
+            '[.[] | select((.status == "in_progress" or .status == "queued") and .databaseId < ($current | tonumber))] | length')
+
+          echo "position=$((EARLIER_RUNS + 1))" >> $GITHUB_OUTPUT
+
+          if [ "$EARLIER_RUNS" -eq 0 ]; then
+            echo "✅ No earlier deployments found. Starting immediately!"
+            echo "📊 Queue position: 1 of 1"
+            exit 0
+          fi
+
+          # Calculate wait time
+          TOTAL_WAIT=$((EARLIER_RUNS * WAIT_PER_JOB))
+          TOTAL_WAIT_MIN=$((TOTAL_WAIT / 60))
+
+          echo "📊 Queue position: $((EARLIER_RUNS + 1))"
+          echo "🚀 Found $EARLIER_RUNS earlier deployment(s)"
+          echo "⏳ Waiting $TOTAL_WAIT seconds ($TOTAL_WAIT_MIN minutes total)"
+          echo ""
+          echo "Earlier deployments in queue:"
+
+          # Show details of earlier runs
+          gh run list \
+            --repo ${{ github.repository }} \
+            --workflow deploy-hetzner.yml \
+            --limit 100 \
+            --json databaseId,status,headBranch,createdAt \
+            | jq --arg current "$CURRENT_RUN_ID" \
+            '.[] | select((.status == "in_progress" or .status == "queued") and .databaseId < ($current | tonumber)) |
+            "  - Run #\(.databaseId) - Branch: \(.headBranch) - Status: \(.status) - Started: \(.createdAt)"' -r
+
+          echo ""
+          echo "⏰ Estimated start time: $(date -d "+$TOTAL_WAIT seconds")"
+
+          # Wait with progress updates
+          ELAPSED=0
+          while [ $ELAPSED -lt $TOTAL_WAIT ]; do
+            REMAINING=$((TOTAL_WAIT - ELAPSED))
+            REMAINING_MIN=$((REMAINING / 60))
+            REMAINING_SEC=$((REMAINING % 60))
+
+            echo "⏳ Time remaining: ${REMAINING_MIN}m ${REMAINING_SEC}s"
+
+            # Check every 30 seconds if earlier jobs finished early
+            sleep 30
+            ELAPSED=$((ELAPSED + 30))
+
+            # Re-check if deployments finished early
+            STILL_RUNNING=$(gh run list \
+              --repo ${{ github.repository }} \
+              --workflow deploy-hetzner.yml \
+              --limit 100 \
+              --json databaseId,status \
+              | jq --arg current "$CURRENT_RUN_ID" \
+              '[.[] | select((.status == "in_progress" or .status == "queued") and .databaseId < ($current | tonumber))] | length')
+
+            if [ "$STILL_RUNNING" -eq 0 ]; then
+              echo "✅ All earlier deployments completed early!"
+              echo "🚀 Starting deployment now (saved $((REMAINING / 60)) minutes)"
+              exit 0
+            fi
+          done
+
+          echo "✅ Wait time completed. Proceeding with deployment!"
+
+  deploy:
+    name: Deploy to Hetzner (Position ${{ needs.wait-for-queue.outputs.position }})
+    needs: [validate-branch, wait-for-queue]
     if: needs.validate-branch.outputs.branch_valid == 'true' && (github.event.inputs.action == 'deploy' || github.event_name == 'push')
     runs-on: ubuntu-latest
     environment:
@@ -172,7 +258,7 @@ jobs:
           echo "📋 Branch: $BRANCH"
           echo "🔗 Sanitized: $SANITIZED_BRANCH"
           echo "🌐 URL: https://nr-${SANITIZED_BRANCH}.${{ vars.TAILNET }}.ts.net"
-      
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -184,11 +270,11 @@ jobs:
         run: |
           # Create SSH directory with proper permissions
           install -m 700 -d ~/.ssh
-          
+
           # Install SSH private key
           echo "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          
+
           # Add host key to known_hosts for security
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
@@ -209,13 +295,13 @@ jobs:
           BRANCH_NAME: ${{ github.event.inputs.branch || github.ref_name }}
         run: |
           set -euo pipefail
-          
+
           echo "::group::🚀 Starting deployment to Hetzner"
           echo "📋 Branch: $BRANCH_NAME"
           echo "🖥️  Server: $HETZNER_HOST"
           echo "🔗 Tailnet: $TAILNET"
           echo "::endgroup::"
-          
+
           # Execute deployment with error handling
           if bash deploy.sh up; then
             echo "::notice::Deployment completed successfully"
@@ -223,7 +309,7 @@ jobs:
             echo "::error::Deployment failed"
             exit 1
           fi
-          
+
           # Write results to job summary
           {
             echo "## 🎯 Deployment Results"
@@ -267,11 +353,11 @@ jobs:
         run: |
           # Create SSH directory with proper permissions
           install -m 700 -d ~/.ssh
-          
+
           # Install SSH private key
           echo "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          
+
           # Add host key to known_hosts for security
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
@@ -293,19 +379,19 @@ jobs:
           ACTION: ${{ github.event.inputs.action }}
         run: |
           set -euo pipefail
-          
+
           # Determine if we should remove dashboard based on action
           REMOVE_DASHBOARD="false"
           if [ "$ACTION" = "cleanup-with-dashboard" ]; then
             REMOVE_DASHBOARD="true"
           fi
-          
+
           echo "::group::🧹 Starting cleanup of Hetzner deployment"
           echo "📋 Branch: $BRANCH_NAME"
           echo "🗑️  Remove Dashboard: $REMOVE_DASHBOARD"
           echo "🖥️  Server: $HETZNER_HOST"
           echo "::endgroup::"
-          
+
           # Execute cleanup with optional dashboard removal
           if [ "$REMOVE_DASHBOARD" = "true" ]; then
             if bash deploy.sh down --remove-dashboard; then
@@ -322,7 +408,7 @@ jobs:
               exit 1
             fi
           fi
-          
+
           # Write results to job summary
           dashboard_status=$([ "$REMOVE_DASHBOARD" = "true" ] && echo "Completely removed" || echo "Updated and preserved")
           {
@@ -357,12 +443,12 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ github.token }}
-          
+
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
       - name: Perform automatic rebase and trigger deployment
         env:
           BRANCH_NAME: ${{ github.event.inputs.branch || github.ref_name }}
@@ -370,17 +456,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          
+
           echo "::group::🔄 Performing automatic rebase"
           echo "📋 Branch: $BRANCH_NAME"
           echo "📍 Base: $BASE_BRANCH"
-          
+
           # Fetch latest changes
           git fetch --all --prune
-          
+
           # Checkout the branch
           git checkout "$BRANCH_NAME"
-          
+
           # Attempt rebase
           if git rebase "origin/$BASE_BRANCH"; then
             echo "✅ Rebase successful - no conflicts"
@@ -426,9 +512,9 @@ jobs:
             echo "git push --force-with-lease origin $BRANCH_NAME"
             exit 1
           fi
-          
+
           echo "::endgroup::"
-          
+
       - name: Create job summary
         if: success()
         run: |
@@ -455,7 +541,7 @@ jobs:
           VALIDATION_MESSAGE: ${{ needs.validate-branch.outputs.validation_message }}
         run: |
           echo "::error::Branch validation failed: $VALIDATION_MESSAGE"
-          
+
           # Write detailed failure information to job summary
           {
             echo "## ❌ Branch Validation Failed"
@@ -480,6 +566,6 @@ jobs:
             echo "- [Git Rebase Documentation](https://git-scm.com/docs/git-rebase)"
             echo "- [Force Push Safely with --force-with-lease](https://git-scm.com/docs/git-push#Documentation/git-push.txt---force-with-leaseltrefnamegt)"
           } >> "$GITHUB_STEP_SUMMARY"
-          
+
           echo "❌ Deployment cancelled due to branch validation failure"
           exit 1
