@@ -868,7 +868,7 @@ generate_dashboard_html() {
         .status-online { background: #e8f5e8; color: #4CAF50; }
         .status-offline { background: #ffebee; color: #f44336; }
         .status-checking { background: #e3f2fd; color: #2196F3; }
-        .status-auto { background: #fff3cd; color: #856404; }
+        .status-auto { background: #fff3cd; color: #856404; border-right: 2px solid #856404; }
         .instance-info { margin-bottom: 0; }
         .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; }
         .info-label { color: #666; font-weight: 600; }
