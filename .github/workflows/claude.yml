@@ -11,11 +11,193 @@ on:
     types: [submitted]
 
 jobs:
+  # Job for PR-triggered requests - simplified workflow without screenshots
+  claude-pr:
+    if: |
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30  # Shorter timeout for PR workflow
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+      actions: read # Required for Claude to read CI results on PRs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            .gitattributes
+            .github/
+            .gitignore
+            .jshintrc
+            API.md
+            CHANGELOG.md
+            CITATION.cff
+            CODE_OF_CONDUCT.md
+            CONTRIBUTING.md
+            Gruntfile.js
+            jsdoc.json
+            LICENSE
+            NODE-RED-ARCHITECTURE.md
+            nodemon.json
+            package.json
+            packages/
+            README.md
+            scripts/
+            SECURITY.md
+            test/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Cache Node modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers and dependencies
+        timeout-minutes: 10
+        run: |
+          # Add retry logic for more reliable installation
+          for i in {1..3}; do
+            npx playwright install --with-deps chromium && break
+            echo "Retry $i/3 failed, waiting..."
+            sleep 10
+          done
+
+      - name: Build Node-RED
+        run: npm run build
+
+      - name: Start Node-RED in background
+        run: |
+          npm start &
+          echo $! > node-red.pid
+          # Enhanced wait for Node-RED to fully initialize
+          echo "⏳ Waiting for Node-RED to start..."
+          for i in {1..30}; do
+            if curl -f http://localhost:1880 >/dev/null 2>&1; then
+              # Also check if UI assets are loaded
+              if curl -f http://localhost:1880/red/red.min.js >/dev/null 2>&1; then
+                echo "✅ Node-RED fully initialized (attempt $i)"
+                break
+              fi
+            fi
+            echo "Waiting... attempt $i/30"
+            sleep 2
+          done
+          curl -f http://localhost:1880 || (echo "❌ Node-RED failed to start after 60 seconds" && exit 1)
+
+      - name: Ensure Playwright MCP directory exists
+        run: mkdir -p .playwright-mcp
+
+      # Create CLAUDE.md with PR-specific instructions
+      - name: Create CLAUDE.md for PR Implementation
+        run: |
+          cat > CLAUDE.md << 'EOF'
+          You are an expert Node-RED developer assisting with pull request feedback.
+          ## CRITICAL INSTRUCTION: IMPLEMENT CHANGES THROUGH ITERATIVELY TESTING CHANGES AND REFINING BASED ON PLAYWRIGHT FEEDBACK
+          You are working on pull request #${{ github.event.pull_request.number }}
+          ## Context:
+          - FIRST: Read NODE-RED-ARCHITECTURE.md to understand the codebase structure
+          - Read the GitHub PR comment/review that triggered this workflow
+          - Node-RED server should be running on http://localhost:1880 (verify with curl) otherwise restart it
+          ## Implement and iteratively adjust based on Playwright testing until completion
+          You are working on PR feedback implementation with iterative testing and refinement. Follow this process:
+          ### MANDATORY Implementation Loop Process
+          1. Analyze the pull request changes and the specific feedback provided
+          2. Make SMALL incremental changes (not the entire implementation at once)
+             - IMPORTANT: File operation best practices to avoid errors:
+               * ALWAYS use Read before Edit - never edit a file you haven't read first
+               * When using Edit, copy the EXACT string including all whitespace and indentation
+               * Verify file paths exist with Glob before trying to read/edit them
+               * If "string not found" error occurs, re-read the file and check for recent changes
+               * Use Write for new files, Edit for existing files
+          3. For frontend changes: run npm run build to rebuild assets
+          4. For backend/core changes: restart Node-RED if needed using:
+          kill $(cat node-red.pid) && npm start & && echo $! > node-red.pid && sleep 10
+          5. **MANDATORY: Navigate to http://localhost:1880 and test with Playwright**
+             - IMPORTANT: Use smart interaction strategies to avoid timeouts:
+               * Before clicking any element, verify it's actually interactive using browser_evaluate to check visibility and position
+               * Use hover (mcp__playwright__browser_hover) for testing hover states and tooltips
+               * Use drag (mcp__playwright__browser_drag) for draggable elements and resizable panels
+               * If an element click times out after 5 seconds, it's likely obscured or not in view - investigate why
+               * Try alternative interaction methods: JavaScript clicks via browser_evaluate, waiting for animations to complete, or scrolling into view
+               * Different resolutions may have different UI layouts - what works on desktop might not work on mobile/tablet
+               * After any UI state changes (opening menus, panels, etc.), wait briefly for animations to complete before next action
+               * If you need to temporarily modify the UI for testing (hiding elements, etc.), restore the original state afterward
+          6. **MANDATORY: Take screenshot and analyze what you see vs what was expected**
+          7. **If testing reveals issues: make additional changes and repeat from step 3**
+          8. **Repeat steps 2-7 until each small change is verified working**
+          9. **ONLY consider complete when Playwright confirms all functionality works correctly**
+          ## CRITICAL: You MUST test each change with Playwright before proceeding
+          - Do NOT implement multiple features without testing each one
+          - Do NOT assume your code works - verify with browser automation
+          - Use Playwright to see the actual visual result after every change
+          ## Playwright-Driven Iterative Development
+          - ALWAYS use Playwright for all browser testing and feedback
+          - Use Playwright to discover what needs adjustment: UI layout, functionality, user experience
+          - Let Playwright testing guide your implementation decisions
+          - After each code change, immediately test with Playwright browser automation
+          - Use Playwright findings to refine and improve the implementation
+          - Continue the implement → test → refine cycle until Playwright confirms success
+          ## ABSOLUTE REQUIREMENT: Let Playwright Drive Improvements
+          - NEVER implement code without immediately testing it with Playwright
+          - Use browser automation to discover edge cases and usability issues
+          - Make iterative improvements based on what you observe through Playwright
+          - Playwright testing should guide refinements
+          - If you complete this session without using Playwright extensively, you have FAILED
+          ## PR-Specific Guidelines
+          - Focus on the specific feedback provided in the PR comment
+          - Make clean, focused changes that address the feedback
+          - Follow existing code conventions and patterns
+          - Don't extend scope beyond what was requested in the PR feedback
+          - Maintain consistency with existing interface patterns
+          - Apply UI/UX best practices based on what Playwright testing reveals
+          ## Environment
+          - Node-RED is running on http://localhost:1880
+          - You are working on PR #${{ github.event.pull_request.number }}
+          - Current branch: ${{ github.head_ref || github.ref_name }}
+          Begin iterative implementation now.
+          EOF
+
+      # Single step for PR implementation with iterative testing
+      - name: Implement PR Request with Testing
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --mcp-config '{"mcpServers":{"playwright":{"command":"npx","args":["@playwright/mcp@latest","--headless"]}}}' 
+            --allowedTools mcp__playwright__browser_close,mcp__playwright__browser_resize,mcp__playwright__browser_console_messages,mcp__playwright__browser_handle_dialog,mcp__playwright__browser_evaluate,mcp__playwright__browser_file_upload,mcp__playwright__browser_fill_form,mcp__playwright__browser_install,mcp__playwright__browser_press_key,mcp__playwright__browser_type,mcp__playwright__browser_navigate,mcp__playwright__browser_navigate_back,mcp__playwright__browser_network_requests,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_drag,mcp__playwright__browser_hover,mcp__playwright__browser_select_option,mcp__playwright__browser_tabs,mcp__playwright__browser_wait_for,Read,Write,Edit,MultiEdit,Bash,Glob,Grep,TodoWrite
+
+      # Remove CLAUDE.md after PR implementation
+      - name: Remove CLAUDE.md after PR Implementation
+        run: rm -f CLAUDE.md
+
+  # Original job for issue-triggered requests with full screenshot workflow
   claude:
     if: |
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     runs-on: ubuntu-latest
     timeout-minutes: 60  # Global job timeout to prevent runaway executions
@@ -339,6 +521,8 @@ jobs:
           5. **MANDATORY: Navigate to http://localhost:1880 and test with Playwright**
              - IMPORTANT: Use smart interaction strategies to avoid timeouts:
                * Before clicking any element, verify it's actually interactive using browser_evaluate to check visibility and position
+               * Use hover (mcp__playwright__browser_hover) for testing hover states and tooltips
+               * Use drag (mcp__playwright__browser_drag) for draggable elements and resizable panels
                * If an element click times out after 5 seconds, it's likely obscured or not in view - investigate why
                * Try alternative interaction methods: JavaScript clicks via browser_evaluate, waiting for animations to complete, or scrolling into view
                * Different resolutions may have different UI layouts - what works on desktop might not work on mobile/tablet
