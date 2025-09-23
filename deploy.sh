@@ -1151,7 +1151,7 @@ generate_dashboard_html() {
                         <div class="instance-header">
                             <h3 class="instance-name">${container.issue_title ? container.issue_title.replace(/^\[NR Modernization Experiment\]\s*/, '') : container.name}</h3>
                             <div class="badge-container">
-                                ${autoGenBadge}
+                                ${autoGenLabel}
                                 <span class="status-badge status-${urlStatus}">${urlStatus}</span>
                             </div>
                         </div>
