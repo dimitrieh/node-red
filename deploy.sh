@@ -853,14 +853,14 @@ generate_dashboard_html() {
         .filter-btn:hover { background: rgba(143, 0, 0, 0.05); color: #8f0000; }
         .filter-btn.active { background: #8f0000; color: white; }
         .instances-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-top: 20px; }
-        .instance-card { background: white; border-radius: 8px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; cursor: pointer; position: relative; overflow: hidden; border: 1px solid #e0e0e0; }
+        .instance-card { background: white; border-radius: 8px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; cursor: pointer; position: relative; overflow: hidden; border: 1px solid #e0e0e0; display: flex; flex-direction: column; }
         .instance-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); border-color: #8f0000; }
         .instance-card.online:hover { border-color: #4CAF50; }
         .instance-card.checking:hover { border-color: #2196F3; }
         .instance-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: #4CAF50; z-index: 1; }
         .instance-card.checking::before { background: #2196F3; }
         .instance-card.offline::before { background: #f44336; }
-        .instance-card-content { padding: 25px; flex: 1; }
+        .instance-card-content { padding: 25px; flex: 1; display: flex; flex-direction: column; }
         .instance-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
         .instance-name { font-size: 1.3rem; font-weight: 600; color: #333; margin: 0; }
         .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 8px; }
@@ -869,14 +869,14 @@ generate_dashboard_html() {
         .status-offline { background: #ffebee; color: #f44336; }
         .status-checking { background: #e3f2fd; color: #2196F3; }
         .status-auto { background: #fff3cd; color: #856404; border-right: 2px solid #856404; }
-        .instance-info { margin-bottom: 0; }
+        .instance-info { margin-bottom: 10px; }
         .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; }
         .info-label { color: #666; font-weight: 600; }
         .info-value { color: #333; font-family: 'SF Mono', Monaco, monospace; font-size: 0.85rem; text-align: right; flex: 1; margin-left: 10px; word-break: break-all; }
         .info-value a { color: #0066cc; text-decoration: none; transition: color 0.2s ease; }
         .info-value code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; color: #8f0000; font-weight: 500; }
         .info-value a:hover { color: #8f0000; text-decoration: underline; }
-        .experiment-link { display: inline-block; margin-top: 10px; padding: 8px 16px; background: white; color: #8f0000; text-decoration: none; border-radius: 4px; font-size: 0.9rem; cursor: pointer; transition: all 0.3s ease; border: 2px solid #8f0000; }
+        .experiment-link { display: inline-block; margin-top: auto; padding: 8px 16px; background: white; color: #8f0000; text-decoration: none; border-radius: 4px; font-size: 0.9rem; cursor: pointer; transition: all 0.3s ease; border: 2px solid #8f0000; }
         .experiment-link:hover { background: #8f0000; color: white; }
         .details-toggle { cursor: pointer; color: #666; padding: 8px 0; font-size: 0.9rem; user-select: none; font-weight: normal; }
         .details-toggle:hover { color: #333; text-decoration: underline; }
@@ -1096,6 +1096,14 @@ generate_dashboard_html() {
                             <span class="info-label">Branch:</span>
                             <span class="info-value"><a href="${container.branch_url}" target="_blank">${container.branch.replace(/^claude\//, '')}</a></span>
                         </div>
+                        ${container.pr_urls && container.pr_urls.length > 0 ? `
+                        <div class="info-row">
+                            <span class="info-label">PR${container.pr_urls.length > 1 ? 's' : ''}:</span>
+                            <span class="info-value">${container.pr_urls.map(pr_url => 
+                                `<a href="${pr_url}" target="_blank">#${pr_url.split('/').pop()}</a>`
+                            ).join(', ')}</span>
+                        </div>
+                        ` : ''}
                         <div class="details-toggle" data-target="${containerId}">▶ Details</div>
                         <div id="${containerId}" class="details-content">
                             <div class="info-row">
