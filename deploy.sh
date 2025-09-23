@@ -1040,6 +1040,14 @@ generate_dashboard_html() {
                             <span class="info-value"><a href="${container.issue_url}" target="_blank">#${container.issue_url.split('/').pop()}</a></span>
                         </div>
                         ` : ''}
+                        ${container.pr_urls && container.pr_urls.length > 0 ? `
+                        <div class="info-row">
+                            <span class="info-label">PR${container.pr_urls.length > 1 ? 's' : ''}:</span>
+                            <span class="info-value">${container.pr_urls.map(pr_url => 
+                                `<a href="${pr_url}" target="_blank">#${pr_url.split('/').pop()}</a>`
+                            ).join(', ')}</span>
+                        </div>
+                        ` : ''}
                         <div class="info-row">
                             <span class="info-label">Experiment:</span>
                             <span class="info-value"><a href="${container.url}" target="_blank">link</a></span>
@@ -1118,7 +1126,10 @@ generate_dashboard_content() {
             
             issue_url=""
             issue_title=""
+            pr_url=""
+            pr_number=""
             
+            # First check for associated issue
             if [ -n "$issue_id" ]; then
                 # Use different repo for Claude branches
                 if [ "$is_claude" = "true" ]; then
@@ -1132,6 +1143,50 @@ generate_dashboard_content() {
                 response=$(curl -s -f "$api_url" 2>/dev/null || echo "{}")
                 issue_title=$(echo "$response" | grep '"title":' | head -1 | sed 's/.*"title": *"\([^"]*\)".*/\1/' | sed 's/\[NR Modernization Experiment\] *//')
             fi
+            
+            # Check for associated PRs on dimitrieh/node-red for this branch
+            # First check open PRs
+            pr_api_url="https://api.github.com/repos/dimitrieh/node-red/pulls?state=open&head=dimitrieh:$branch&sort=created&direction=desc"
+            pr_response_open=$(curl -s -f "$pr_api_url" 2>/dev/null || echo "[]")
+            
+            # Then check closed PRs if needed
+            pr_api_url="https://api.github.com/repos/dimitrieh/node-red/pulls?state=closed&head=dimitrieh:$branch&sort=created&direction=desc"
+            pr_response_closed=$(curl -s -f "$pr_api_url" 2>/dev/null || echo "[]")
+            
+            # Combine responses (open PRs first, then closed)
+            pr_response=$(echo "$pr_response_open" | sed 's/\]$//' | sed 's/^\[//')
+            if [ "$pr_response" != "" ] && [ "$pr_response_closed" != "[]" ]; then
+                pr_response="${pr_response},"
+            fi
+            pr_response="[${pr_response}$(echo "$pr_response_closed" | sed 's/\]$//' | sed 's/^\[//')]"
+            
+            # Extract all PR numbers and create JSON array
+            pr_numbers=$(echo "$pr_response" | grep '"number":' | sed 's/.*"number": *\([0-9]*\).*/\1/' | tr '\n' ' ')
+            pr_urls="["
+            pr_list=""
+            most_recent_pr_number=""
+            most_recent_pr_title=""
+            
+            if [ -n "$pr_numbers" ]; then
+                # The first PR in the list is the most recent (open if any, otherwise most recent closed)
+                most_recent_pr_number=$(echo "$pr_numbers" | awk '{print $1}')
+                most_recent_pr_title=$(echo "$pr_response" | grep -m1 '"title":' | sed 's/.*"title": *"\([^"]*\)".*/\1/')
+                
+                for pr_num in $pr_numbers; do
+                    if [ -n "$pr_list" ]; then
+                        pr_urls="${pr_urls},"
+                        pr_list="${pr_list},"
+                    fi
+                    pr_urls="${pr_urls}\"https://github.com/dimitrieh/node-red/pull/$pr_num\""
+                    pr_list="${pr_list}$pr_num"
+                done
+                
+                # If we don't have an issue title yet, use the most recent PR title
+                if [ -z "$issue_title" ] && [ -n "$most_recent_pr_title" ]; then
+                    issue_title="PR #$most_recent_pr_number: $most_recent_pr_title"
+                fi
+            fi
+            pr_urls="${pr_urls}]"
             
             # Get git info using common function
             branch_repo_dir=~/node-red-deployments-$branch
@@ -1147,6 +1202,8 @@ generate_dashboard_content() {
         "url": "https://$name.${TAILNET}.ts.net",
         "issue_url": "$issue_url",
         "issue_title": "$issue_title",
+        "pr_urls": $pr_urls,
+        "pr_numbers": "$pr_list",
         "branch": "$branch",
         "commit": "$commit_short",
         "commit_url": "$commit_url",
