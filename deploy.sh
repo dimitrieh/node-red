@@ -1156,6 +1156,10 @@ generate_dashboard_html() {
                             </div>
                         </div>
                         <div class="instance-info">
+                            <div class="info-row">
+                                <span class="info-label">Deployed:</span>
+                                <span class="info-value" title="${deployedTime}">${deployedRelative}</span>
+                            </div>
                             ${container.issue_url ? `
                             <div class="info-row">
                                 <span class="info-label">Issue:</span>
@@ -1170,10 +1174,6 @@ generate_dashboard_html() {
                                 ).join(', ')}</span>
                             </div>
                             ` : ''}
-                            <div class="info-row">
-                                <span class="info-label">Deployed:</span>
-                                <span class="info-value" title="${deployedTime}">${deployedRelative}</span>
-                            </div>
                             <div class="details-toggle" data-target="${containerId}">▶ Details</div>
                             <div id="${containerId}" class="details-content">
                                 ${container.branch && container.commit ? `
