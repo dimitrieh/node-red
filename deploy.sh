@@ -1086,31 +1086,18 @@ generate_dashboard_html() {
                 const deployedTime = deployedDate.toLocaleString();
                 const deployedRelative = getRelativeTime(deployedDate);
                 const containerId = 'details-' + Math.random().toString(36).substr(2, 9);
-                const autoGenBadge = container.is_claude ? ' <span class="status-badge status-auto" title="Auto-generated experiment that may have unintended changes. Mostly for quickly checking generated results.">(auto-generated)</span>' : '';
-                
                 experimentItems += `
                     <div class="experiment-item">
-                        <div class="info-row">
-                            <span class="info-value">${container.branch.replace(/^claude\//, '')}${autoGenBadge}</span>
-                        </div>
                         <div class="info-row">
                             <span class="info-label">Deployed:</span>
                             <span class="info-value" title="${deployedTime}">${deployedRelative}</span>
                         </div>
-                        ${container.pr_urls && container.pr_urls.length > 0 ? `
                         <div class="info-row">
-                            <span class="info-label">PR${container.pr_urls.length > 1 ? 's' : ''}:</span>
-                            <span class="info-value">${container.pr_urls.map(pr_url => 
-                                `<a href="${pr_url}" target="_blank">#${pr_url.split('/').pop()}</a>`
-                            ).join(', ')}</span>
+                            <span class="info-label">Branch:</span>
+                            <span class="info-value">${container.branch.replace(/^claude\//, '')}</span>
                         </div>
-                        ` : ''}
                         <div class="details-toggle" data-target="${containerId}">▶ Details</div>
                         <div id="${containerId}" class="details-content">
-                            <div class="info-row">
-                                <span class="info-label">Branch:</span>
-                                <span class="info-value"><a href="${container.branch_url}" target="_blank">${container.branch.replace(/^claude\//, '')}</a></span>
-                            </div>
                             <div class="info-row">
                                 <span class="info-label">Commit:</span>
                                 <span class="info-value"><a href="${container.commit_url}" target="_blank">${container.commit}</a></span>
@@ -1145,17 +1132,12 @@ generate_dashboard_html() {
             const deployedTime = deployedDate.toLocaleString();
             const deployedRelative = getRelativeTime(deployedDate);
             const containerId = 'details-' + Math.random().toString(36).substr(2, 9);
-            const autoGenLabel = container.is_claude ? ' <span class="status-badge status-auto" title="Auto-generated experiment that may have unintended changes. Mostly for quickly checking generated results.">(auto-generated)</span>' : '';
-            
             return `
                 <div class="instance-card ${statusClass}" data-url="${container.url}">
                     <div class="instance-card-content">
                         <div class="instance-header">
                             <h3 class="instance-name">${container.issue_title ? container.issue_title.replace(/^\[NR Modernization Experiment\]\s*/, '') : container.name.replace(/^claude-/, '')}</h3>
-                            <div class="badge-container">
-                                ${autoGenLabel}
-                                <span class="status-badge status-${urlStatus}">${urlStatus}</span>
-                            </div>
+                            <span class="status-badge status-${urlStatus}">${urlStatus}</span>
                         </div>
                         <div class="instance-info">
                             <div class="info-row">
@@ -1176,22 +1158,19 @@ generate_dashboard_html() {
                                 ).join(', ')}</span>
                             </div>
                             ` : ''}
-                            <div class="details-toggle" data-target="${containerId}">▶ Details</div>
-                            <div id="${containerId}" class="details-content">
-                                ${container.branch && container.commit ? `
-                                <div class="info-row">
-                                    <span class="info-label">Branch:</span>
-                                    <span class="info-value"><a href="${container.branch_url}" target="_blank">${container.branch.replace(/^claude\//, '')}</a></span>
-                                </div>
-                                <div class="info-row">
-                                    <span class="info-label">Commit:</span>
-                                    <span class="info-value"><a href="${container.commit_url}" target="_blank">${container.commit}</a></span>
-                                </div>
-                                ` : ''}
-                                <div class="info-row">
-                                    <span class="info-label">Image:</span>
-                                    <span class="info-value"><code>${container.image}</code></span>
-                                </div>
+                            ${container.branch && container.commit ? `
+                            <div class="info-row">
+                                <span class="info-label">Branch:</span>
+                                <span class="info-value"><a href="${container.branch_url}" target="_blank">${container.branch.replace(/^claude\//, '')}</a></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Commit:</span>
+                                <span class="info-value"><a href="${container.commit_url}" target="_blank">${container.commit}</a></span>
+                            </div>
+                            ` : ''}
+                            <div class="info-row">
+                                <span class="info-label">Image:</span>
+                                <span class="info-value"><code>${container.image}</code></span>
                             </div>
                             <div class="experiment-link" data-url="${container.url}">Open live experiment</div>
                         </div>
