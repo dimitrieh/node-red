@@ -437,6 +437,9 @@ jobs:
     needs: validate-branch
     if: needs.validate-branch.outputs.needs_rebase == 'true' && (github.event.inputs.action == 'deploy' || github.event_name == 'push')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to push rebased branch
+      actions: write   # Required to trigger workflow dispatch
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
