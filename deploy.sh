@@ -994,6 +994,7 @@ generate_dashboard_html() {
         .badge-container { display: flex; align-items: center; }
         .grouped-card .image-header { padding: 15px 0; border-bottom: 1px solid #e0e0e0; }
         .experiment-item { padding: 20px 0; border-bottom: 1px solid #e0e0e0; }
+        .experiment-item:first-child { border-top: 1px solid #e0e0e0; }
         .experiment-item:last-child { border-bottom: none; padding-bottom: 0; }
         .experiment-name { font-weight: 600; font-size: 1.1rem; margin-bottom: 8px; color: #333; }
         .experiment-sub-link { display: inline-block; margin-top: 10px; padding: 8px 16px; background: white; color: #8f0000; text-decoration: none; border-radius: 4px; font-size: 0.9rem; cursor: pointer; transition: all 0.3s ease; border: 2px solid #8f0000; }
