@@ -1,91 +1,22 @@
+![logo](https://github.com/user-attachments/assets/b0c8ce6b-1d9e-4e15-a15f-bc3babd5ec84)
+
 # Node-RED Experimentation Repository
 
-## Demo Mode & Deployment
+This repository is part of the Node-RED Modernization Project and is used to create experimental versions of Node-RED for fast iterative designing and to aid in implementating any approved changes as a result of testing.
 
-This fork includes sandbox mode for safe public demo access and branch-specific Docker deployments.
+For more information on the Node-RED Modernization Project please see this [Node-RED Forum post](https://discourse.nodered.org/t/initiating-a-modernization-project-for-node-red/59597).
 
-### Docker Deployment
+**Note:** This repsitory is public but not interactable. Please reach out through the [official Node-RED issue tracker](https://dashboard.tailbfedba.ts.net/) for any inquieries or feedback for now.
 
-Use the `deploy.sh` script for branch-specific deployments with Tailscale networking:
+## Workflow
 
-```bash
-# Deploy current branch
-./deploy.sh up -d
+- This repository has been optimised so that you can develop locally using the default Node-RED development workflow or by using AI workflows in Github actions triggered in issues and pull requests.
+- Upon deployment all unnecessary files are ignored, demo mode activated, and a specific docker image is generated.
+- Generation of docker images and deployment of containers is done on a VM with [Tailscale](https://tailscale.com/) as the reverse proxy manager and monitor.
+- Each live Node-RED instance has "sandbox mode" active for safe public demo access.
+- The [dashboard](https://dashboard.tailbfedba.ts.net/) gets updated and deployed after every push as well.
 
-# Stop deployment
-./deploy.sh down
-
-# View logs
-./deploy.sh logs
-```
-
-The script automatically:
-- Creates branch-specific containers (e.g., `nr-debug-panel-bottom`)
-- Generates docker-compose.yml from template
-- Sets up Tailscale networking with HTTPS
-- Configures isolated Docker networks and volumes
-
-**Requirements:**
-- Set `TS_AUTHKEY` environment variable for Tailscale
-- Each branch gets its own isolated deployment
-
-**Access:** `https://nr-{branch-name}.[your-tailnet].ts.net`
-
-## Quick Start
-
-Check out https://nodered.org/docs/getting-started/ for full instructions on getting
-started.
-
-1. `sudo npm install -g --unsafe-perm node-red`
-2. `node-red`
-3. Open <http://localhost:1880>
-
-## Getting Help
-
-More documentation can be found [here](https://nodered.org/docs).
-
-For further help, or general discussion, please use the [Node-RED Forum](https://discourse.nodered.org) or [slack team](https://nodered.org/slack).
-
-## Developers
-
-If you want to run the latest code from git, here's how to get started:
-
-1. Clone the code:
-
-        git clone https://github.com/node-red/node-red.git
-        cd node-red
-
-2. Install the node-red dependencies
-
-        npm install
-
-3. Build the code
-
-        npm run build
-
-4. Run
-
-        npm start
-
-## Contributing
-
-Before raising a pull-request, please read our
-[contributing guide](https://github.com/node-red/node-red/blob/master/CONTRIBUTING.md).
-
-This project adheres to the [Contributor Covenant 1.4](http://contributor-covenant.org/version/1/4/).
- By participating, you are expected to uphold this code. Please report unacceptable
- behavior to any of the project's core team at team@nodered.org.
-
-## Authors
-
-Node-RED is a project of the [OpenJS Foundation](http://openjsf.org).
-
-It is maintained by:
-
- * Nick O'Leary [@knolleary](http://twitter.com/knolleary)
- * Dave Conway-Jones [@ceejay](http://twitter.com/ceejay)
- * And many others...
-
+**Note:** There are a lot of optimisations to be done. Most code and workflows in this repository and the experiments it created should be considered experimental code at best, not production code. This is a repository meant for iterative design experimentation together with the open-source community of [Node-RED](https://nodered.org/).
 
 ## Copyright and license
 
