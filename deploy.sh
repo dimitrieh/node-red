@@ -996,6 +996,7 @@ generate_dashboard_html() {
             <div class="header-links">
                 <a href="https://discourse.nodered.org/t/node-red-survey-shaping-the-future-of-node-reds-user-experience/98346" target="_blank" rel="noopener noreferrer" class="header-link">Modernization Project</a>
                 <a href="https://github.com/node-red/node-red/issues" target="_blank" rel="noopener noreferrer" class="header-link">Issue Tracker</a>
+                <a href="https://github.com/dimitrieh/node-red" target="_blank" rel="noopener noreferrer" class="header-link">Experimentation Repository</a>
             </div>
         </div>
         <div class="controls">
