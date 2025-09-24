@@ -577,6 +577,11 @@ setup_issue_survey() {
     # Extract issue ID from branch name (issue-NNNN pattern)
     local issue_id=$(echo "$branch" | sed -n 's/^issue-\([0-9]\+\)$/\1/p')
     
+    # Extract issue ID from claude branch pattern (claude-issue-NNNN-* pattern)
+    if [ -z "$issue_id" ]; then
+        issue_id=$(echo "$branch" | sed -n 's/^claude-issue-\([0-9]\+\).*$/\1/p')
+    fi
+    
     # Extract experiment ID from branch name (experiment-* pattern)
     local experiment_id=$(echo "$branch" | sed -n 's/^experiment-\(.\+\)$/\1/p')
     
