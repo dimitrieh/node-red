@@ -639,12 +639,28 @@ setup_issue_survey() {
         return 0
     fi
     
-    # Survey name matches branch name
-    local survey_name="$branch"
+    # Survey name should be based on issue ID (if present) or experiment name
+    # This ensures all branches for the same issue share the same survey
+    local survey_name=""
     local template_name="nr-experiment-template"
+    
+    if [ -n "$issue_id" ]; then
+        # For issue branches, use issue-NNNN format regardless of branch name
+        survey_name="issue-$issue_id"
+        log "${BLUE}📋 [TALLY] Using issue-based survey name: '$survey_name' (from branch: $branch)${NC}"
+    elif [ -n "$experiment_id" ]; then
+        # For experiment branches, use the full branch name
+        survey_name="$branch"
+        log "${BLUE}📋 [TALLY] Using experiment survey name: '$survey_name'${NC}"
+    else
+        # Shouldn't reach here due to earlier check, but handle it
+        survey_name="$branch"
+        log "${YELLOW}⚠️  [TALLY] Using fallback survey name: '$survey_name'${NC}"
+    fi
     
     log "${BLUE}📋 [TALLY] Survey configuration:${NC}"
     log "${BLUE}   - Survey name: '$survey_name'${NC}"
+    log "${BLUE}   - Branch name: '$branch'${NC}"
     log "${BLUE}   - Template name: '$template_name'${NC}"
     
     # Check if survey already exists
