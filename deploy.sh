@@ -978,7 +978,7 @@ generate_dashboard_html() {
         .status-offline { background: #ffebee; color: #f44336; }
         .status-checking { background: #e3f2fd; color: #2196F3; }
         .status-auto { background: #fff3cd; color: #856404; border-right: 2px solid #856404; }
-        .instance-top-info { padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid #e0e0e0; }
+        .instance-top-info { padding-bottom: 12px; margin-bottom: 20px; border-bottom: 1px solid #e0e0e0; }
         .instance-info { margin-bottom: 10px; }
         .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; }
         .info-label { color: #666; font-weight: 600; }
@@ -994,9 +994,8 @@ generate_dashboard_html() {
         .details-content.expanded { display: block; }
         .badge-container { display: flex; align-items: center; }
         .grouped-card .image-header { padding: 15px 0; border-bottom: 1px solid #e0e0e0; }
-        .experiment-item { padding: 20px 0; border-bottom: 1px solid #e0e0e0; }
-        .experiment-item:first-child { border-top: 1px solid #e0e0e0; margin-top: 12px; }
-        .experiment-item:last-child { border-bottom: none; padding-bottom: 0; }
+        .experiment-item { padding: 20px 0 12px 0; border-top: 1px solid #e0e0e0; margin-top: 8px; }
+        .experiment-item:last-child { padding-bottom: 0; }
         .experiment-name { font-weight: 600; font-size: 1.1rem; margin-bottom: 8px; color: #333; }
         .experiment-sub-link { display: inline-block; margin-top: 10px; padding: 8px 16px; background: white; color: #8f0000; text-decoration: none; border-radius: 4px; font-size: 0.9rem; cursor: pointer; transition: all 0.3s ease; border: 2px solid #8f0000; }
         .experiment-sub-link:hover { background: #8f0000; color: white; }
