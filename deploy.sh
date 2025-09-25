@@ -71,7 +71,7 @@ validate_tailscale_connection() {
         log "Attempt $attempt/$max_attempts: Checking Tailscale status..."
         
         # Wait for container to initialize
-        sleep 20
+        sleep 60
         
         # Check if container is running
         if ! docker ps --format "table {{.Names}}" | grep -q "^$container_name$"; then
