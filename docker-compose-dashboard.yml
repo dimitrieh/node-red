@@ -4,7 +4,6 @@ services:
   dashboard:
     image: nginx:alpine
     container_name: dashboard
-    user: "101:101"
     volumes:
       - dashboard_content:/usr/share/nginx/html:ro
     security_opt:
@@ -13,10 +12,15 @@ services:
       - ALL
     cap_add:
       - NET_BIND_SERVICE
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETUID
+      - SETGID
     read_only: true
     tmpfs:
       - /var/cache/nginx
       - /var/run
+      - /tmp
     restart: unless-stopped
     networks:
       - dashboard-net
@@ -37,6 +41,9 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - NET_RAW
     restart: unless-stopped
     networks:
       - dashboard-net
