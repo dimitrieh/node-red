@@ -35,8 +35,98 @@ env:
   GITHUB_ISSUES_REPO: ${{ vars.GITHUB_ISSUES_REPO || 'node-red/node-red' }}
 
 jobs:
+  wait-for-queue:
+    name: Wait for Deployment Queue
+    if: github.event.inputs.action == 'deploy' || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      position: ${{ steps.check-queue.outputs.position }}
+    steps:
+      - name: Check queue position and wait
+        id: check-queue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CURRENT_RUN_ID=${{ github.run_id }}
+          WAIT_PER_JOB=120  # 2 minutes per earlier job
+
+          echo "🔍 Current run ID: $CURRENT_RUN_ID"
+          echo "⏱️  Checking for earlier deployments..."
+
+          # Count earlier in-progress or queued runs
+          EARLIER_RUNS=$(gh run list \
+            --repo ${{ github.repository }} \
+            --workflow deploy-hetzner.yml \
+            --limit 100 \
+            --json databaseId,status,headBranch,createdAt \
+            | jq --arg current "$CURRENT_RUN_ID" \
+            '[.[] | select((.status == "in_progress" or .status == "queued") and .databaseId < ($current | tonumber))] | length')
+
+          echo "position=$((EARLIER_RUNS + 1))" >> $GITHUB_OUTPUT
+
+          if [ "$EARLIER_RUNS" -eq 0 ]; then
+            echo "✅ No earlier deployments found. Starting immediately!"
+            echo "📊 Queue position: 1 of 1"
+            exit 0
+          fi
+
+          # Calculate wait time
+          TOTAL_WAIT=$((EARLIER_RUNS * WAIT_PER_JOB))
+          TOTAL_WAIT_MIN=$((TOTAL_WAIT / 60))
+
+          echo "📊 Queue position: $((EARLIER_RUNS + 1))"
+          echo "🚀 Found $EARLIER_RUNS earlier deployment(s)"
+          echo "⏳ Waiting $TOTAL_WAIT seconds ($TOTAL_WAIT_MIN minutes total)"
+          echo ""
+          echo "Earlier deployments in queue:"
+
+          # Show details of earlier runs
+          gh run list \
+            --repo ${{ github.repository }} \
+            --workflow deploy-hetzner.yml \
+            --limit 100 \
+            --json databaseId,status,headBranch,createdAt \
+            | jq --arg current "$CURRENT_RUN_ID" \
+            '.[] | select((.status == "in_progress" or .status == "queued") and .databaseId < ($current | tonumber)) |
+            "  - Run #\(.databaseId) - Branch: \(.headBranch) - Status: \(.status) - Started: \(.createdAt)"' -r
+
+          echo ""
+          echo "⏰ Estimated start time: $(date -d "+$TOTAL_WAIT seconds")"
+
+          # Wait with progress updates
+          ELAPSED=0
+          while [ $ELAPSED -lt $TOTAL_WAIT ]; do
+            REMAINING=$((TOTAL_WAIT - ELAPSED))
+            REMAINING_MIN=$((REMAINING / 60))
+            REMAINING_SEC=$((REMAINING % 60))
+
+            echo "⏳ Time remaining: ${REMAINING_MIN}m ${REMAINING_SEC}s"
+
+            # Check every 30 seconds if earlier jobs finished early
+            sleep 30
+            ELAPSED=$((ELAPSED + 30))
+
+            # Re-check if deployments finished early
+            STILL_RUNNING=$(gh run list \
+              --repo ${{ github.repository }} \
+              --workflow deploy-hetzner.yml \
+              --limit 100 \
+              --json databaseId,status \
+              | jq --arg current "$CURRENT_RUN_ID" \
+              '[.[] | select((.status == "in_progress" or .status == "queued") and .databaseId < ($current | tonumber))] | length')
+
+            if [ "$STILL_RUNNING" -eq 0 ]; then
+              echo "✅ All earlier deployments completed early!"
+              echo "🚀 Starting deployment now (saved $((REMAINING / 60)) minutes)"
+              exit 0
+            fi
+          done
+
+          echo "✅ Wait time completed. Proceeding with deployment!"
+
   validate-branch:
     name: Validate Branch Rebase
+    needs: wait-for-queue
     runs-on: ubuntu-latest
     outputs:
       branch_valid: ${{ steps.validate.outputs.valid }}
@@ -145,99 +235,9 @@ jobs:
             echo "❌ **FAILED**: ${{ steps.validate.outputs.message }}" >> $GITHUB_STEP_SUMMARY
           fi
 
-  wait-for-queue:
-    name: Wait for Deployment Queue
-    needs: validate-branch
-    if: needs.validate-branch.outputs.branch_valid == 'true' && (github.event.inputs.action == 'deploy' || github.event_name == 'push')
-    runs-on: ubuntu-latest
-    outputs:
-      position: ${{ steps.check-queue.outputs.position }}
-    steps:
-      - name: Check queue position and wait
-        id: check-queue
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          CURRENT_RUN_ID=${{ github.run_id }}
-          WAIT_PER_JOB=120  # 2 minutes per earlier job
-
-          echo "🔍 Current run ID: $CURRENT_RUN_ID"
-          echo "⏱️  Checking for earlier deployments..."
-
-          # Count earlier in-progress or queued runs
-          EARLIER_RUNS=$(gh run list \
-            --repo ${{ github.repository }} \
-            --workflow deploy-hetzner.yml \
-            --limit 100 \
-            --json databaseId,status,headBranch,createdAt \
-            | jq --arg current "$CURRENT_RUN_ID" \
-            '[.[] | select((.status == "in_progress" or .status == "queued") and .databaseId < ($current | tonumber))] | length')
-
-          echo "position=$((EARLIER_RUNS + 1))" >> $GITHUB_OUTPUT
-
-          if [ "$EARLIER_RUNS" -eq 0 ]; then
-            echo "✅ No earlier deployments found. Starting immediately!"
-            echo "📊 Queue position: 1 of 1"
-            exit 0
-          fi
-
-          # Calculate wait time
-          TOTAL_WAIT=$((EARLIER_RUNS * WAIT_PER_JOB))
-          TOTAL_WAIT_MIN=$((TOTAL_WAIT / 60))
-
-          echo "📊 Queue position: $((EARLIER_RUNS + 1))"
-          echo "🚀 Found $EARLIER_RUNS earlier deployment(s)"
-          echo "⏳ Waiting $TOTAL_WAIT seconds ($TOTAL_WAIT_MIN minutes total)"
-          echo ""
-          echo "Earlier deployments in queue:"
-
-          # Show details of earlier runs
-          gh run list \
-            --repo ${{ github.repository }} \
-            --workflow deploy-hetzner.yml \
-            --limit 100 \
-            --json databaseId,status,headBranch,createdAt \
-            | jq --arg current "$CURRENT_RUN_ID" \
-            '.[] | select((.status == "in_progress" or .status == "queued") and .databaseId < ($current | tonumber)) |
-            "  - Run #\(.databaseId) - Branch: \(.headBranch) - Status: \(.status) - Started: \(.createdAt)"' -r
-
-          echo ""
-          echo "⏰ Estimated start time: $(date -d "+$TOTAL_WAIT seconds")"
-
-          # Wait with progress updates
-          ELAPSED=0
-          while [ $ELAPSED -lt $TOTAL_WAIT ]; do
-            REMAINING=$((TOTAL_WAIT - ELAPSED))
-            REMAINING_MIN=$((REMAINING / 60))
-            REMAINING_SEC=$((REMAINING % 60))
-
-            echo "⏳ Time remaining: ${REMAINING_MIN}m ${REMAINING_SEC}s"
-
-            # Check every 30 seconds if earlier jobs finished early
-            sleep 30
-            ELAPSED=$((ELAPSED + 30))
-
-            # Re-check if deployments finished early
-            STILL_RUNNING=$(gh run list \
-              --repo ${{ github.repository }} \
-              --workflow deploy-hetzner.yml \
-              --limit 100 \
-              --json databaseId,status \
-              | jq --arg current "$CURRENT_RUN_ID" \
-              '[.[] | select((.status == "in_progress" or .status == "queued") and .databaseId < ($current | tonumber))] | length')
-
-            if [ "$STILL_RUNNING" -eq 0 ]; then
-              echo "✅ All earlier deployments completed early!"
-              echo "🚀 Starting deployment now (saved $((REMAINING / 60)) minutes)"
-              exit 0
-            fi
-          done
-
-          echo "✅ Wait time completed. Proceeding with deployment!"
-
   deploy:
     name: Deploy to Hetzner (Position ${{ needs.wait-for-queue.outputs.position }})
-    needs: [validate-branch, wait-for-queue]
+    needs: [wait-for-queue, validate-branch]
     if: needs.validate-branch.outputs.branch_valid == 'true' && (github.event.inputs.action == 'deploy' || github.event_name == 'push')
     runs-on: ubuntu-latest
     environment:
