@@ -703,6 +703,9 @@ setup_issue_survey() {
 fetch_experiment_title() {
     local branch="$1"
     local experiment_title=""
+    local experiment_url=""
+    local issue_url=""
+    local pr_url=""
     
     log "${BLUE}🔍 Fetching experiment title for branch: '$branch'${NC}"
     
@@ -720,11 +723,17 @@ fetch_experiment_title() {
         
         # Determine which repo to use
         local api_url
+        local repo_path
         if [[ "$branch" =~ ^claude- ]]; then
             api_url="https://api.github.com/repos/dimitrieh/node-red/issues/$issue_id"
+            repo_path="dimitrieh/node-red"
         else
-            api_url="https://api.github.com/repos/${GITHUB_ISSUES_REPO:-dimitrieh/node-red}/issues/$issue_id"
+            repo_path="${GITHUB_ISSUES_REPO:-dimitrieh/node-red}"
+            api_url="https://api.github.com/repos/$repo_path/issues/$issue_id"
         fi
+        
+        # Set issue URL
+        issue_url="https://github.com/$repo_path/issues/$issue_id"
         
         # Fetch issue title
         local response
@@ -740,50 +749,69 @@ fetch_experiment_title() {
             if [ -n "$experiment_title" ]; then
                 log "${GREEN}✅ Found issue title: $experiment_title${NC}"
                 export EXPERIMENT_TITLE="$experiment_title"
-                return 0
             fi
         fi
     fi
     
-    # If no issue title, try to find PR title
-    if [ -z "$experiment_title" ]; then
-        log "${BLUE}🔄 Checking for PR titles...${NC}"
-        
-        # Convert branch name for GitHub API
-        local github_branch="$branch"
-        if [[ "$branch" == claude-* ]]; then
-            github_branch=$(echo "$branch" | sed 's/^claude-/claude\//g')
-        fi
-        
-        # Check for open PRs
-        local pr_api_url="https://api.github.com/repos/dimitrieh/node-red/pulls?state=open&head=dimitrieh:$github_branch&sort=created&direction=desc"
-        local pr_response
-        if [ -n "${GITHUB_TOKEN:-}" ]; then
-            pr_response=$(curl -s -f -H "Authorization: token $GITHUB_TOKEN" "$pr_api_url" 2>/dev/null || echo "[]")
-        else
-            pr_response=$(curl -s -f "$pr_api_url" 2>/dev/null || echo "[]")
-        fi
-        
-        # Parse PR title
-        if echo "$pr_response" | jq -e '.[0]' >/dev/null 2>&1; then
-            local pr_title=$(echo "$pr_response" | jq -r '.[0].title // ""')
-            local pr_number=$(echo "$pr_response" | jq -r '.[0].number // ""')
-            if [ -n "$pr_title" ] && [ -n "$pr_number" ]; then
+    # Check for PRs (always check, for URL priority)
+    log "${BLUE}🔄 Checking for PR...${NC}"
+    
+    # Convert branch name for GitHub API
+    local github_branch="$branch"
+    if [[ "$branch" == claude-* ]]; then
+        github_branch=$(echo "$branch" | sed 's/^claude-/claude\//g')
+    fi
+    
+    # Check for open PRs
+    local pr_api_url="https://api.github.com/repos/dimitrieh/node-red/pulls?state=open&head=dimitrieh:$github_branch&sort=created&direction=desc"
+    local pr_response
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        pr_response=$(curl -s -f -H "Authorization: token $GITHUB_TOKEN" "$pr_api_url" 2>/dev/null || echo "[]")
+    else
+        pr_response=$(curl -s -f "$pr_api_url" 2>/dev/null || echo "[]")
+    fi
+    
+    # Parse PR
+    if echo "$pr_response" | jq -e '.[0]' >/dev/null 2>&1; then
+        local pr_title=$(echo "$pr_response" | jq -r '.[0].title // ""')
+        local pr_number=$(echo "$pr_response" | jq -r '.[0].number // ""')
+        if [ -n "$pr_number" ]; then
+            pr_url="https://github.com/dimitrieh/node-red/pull/$pr_number"
+            
+            # If no issue title was found, use PR title for the title
+            if [ -z "$experiment_title" ] && [ -n "$pr_title" ]; then
                 experiment_title="PR #$pr_number: $pr_title"
                 log "${GREEN}✅ Found PR title: $experiment_title${NC}"
                 export EXPERIMENT_TITLE="$experiment_title"
-                return 0
+            else
+                log "${GREEN}✅ Found PR #$pr_number (will use for URL)${NC}"
             fi
         fi
     fi
     
-    # Fallback to branch name
+    # Determine URL priority: PR > Issue > Branch
+    if [ -n "$pr_url" ]; then
+        experiment_url="$pr_url"
+        log "${BLUE}🔗 Using PR URL: $experiment_url${NC}"
+    elif [ -n "$issue_url" ]; then
+        experiment_url="$issue_url"
+        log "${BLUE}🔗 Using Issue URL: $experiment_url${NC}"
+    else
+        # Default to branch URL
+        experiment_url="https://github.com/dimitrieh/node-red/tree/$branch"
+        log "${BLUE}🔗 Using Branch URL: $experiment_url${NC}"
+    fi
+    
+    # Fallback to branch name if no title found
     if [ -z "$experiment_title" ]; then
         experiment_title="$branch"
         log "${YELLOW}⚠️  No issue/PR title found, using branch name: $experiment_title${NC}"
+        export EXPERIMENT_TITLE="$experiment_title"
     fi
     
-    export EXPERIMENT_TITLE="$experiment_title"
+    # Export the URL
+    export EXPERIMENT_URL="$experiment_url"
+    
     return 0
 }
 
@@ -1948,13 +1976,13 @@ deploy_local() {
     # Run docker-compose
     if [ "$1" = "up" ] || [ "$1" = "" ]; then
         log "Running: docker compose -f $COMPOSE_FILE up -d"
-        env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" docker compose -f "$COMPOSE_FILE" up -d
+        env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" EXPERIMENT_URL="$EXPERIMENT_URL" docker compose -f "$COMPOSE_FILE" up -d
         
         # Validate Tailscale connection and retry if needed
         validate_and_retry_tailscale "nr-$BRANCH_NAME-tailscale" "nr_${BRANCH_NAME}_tailscale" "$COMPOSE_FILE" "tailscale"
     else
         log "Running: docker compose -f $COMPOSE_FILE $*"
-        env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" docker compose -f "$COMPOSE_FILE" "$@"
+        env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" EXPERIMENT_URL="$EXPERIMENT_URL" docker compose -f "$COMPOSE_FILE" "$@"
     fi
     
     if [ "$1" = "up" ] || [ "$1" = "" ]; then
@@ -2200,7 +2228,7 @@ deploy_remote_execution() {
         
         # Deploy with docker-compose
         log "${BLUE}Deploying with docker-compose...${NC}"
-        if env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" docker compose -f docker-compose.yml up -d; then
+        if env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" EXPERIMENT_URL="$EXPERIMENT_URL" docker compose -f docker-compose.yml up -d; then
             log "${GREEN}✅ Main deployment successful${NC}"
             
             # Validate Tailscale connection and retry if needed
@@ -2341,7 +2369,7 @@ deploy_remote_execution() {
         else
             # For other commands
             log "Running: docker compose $@"
-            env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" docker compose -f docker-compose.yml "$@"
+            env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" EXPERIMENT_URL="$EXPERIMENT_URL" docker compose -f docker-compose.yml "$@"
         fi
     fi
     
