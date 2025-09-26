@@ -337,7 +337,7 @@ jobs:
 
   cleanup:
     name: Cleanup Hetzner Deployment
-    needs: validate-branch
+    needs: [wait-for-queue, validate-branch]
     if: github.event.inputs.action == 'cleanup' || github.event.inputs.action == 'cleanup-with-dashboard'
     runs-on: ubuntu-latest
     environment: nr-experiments
