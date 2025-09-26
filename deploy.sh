@@ -73,9 +73,14 @@ validate_tailscale_connection() {
         # Wait for container to initialize
         sleep 60
         
-        # Check if container is running
-        if ! docker ps --format "table {{.Names}}" | grep -q "^$container_name$"; then
-            log "${RED}❌ Tailscale container $container_name is not running${NC}"
+        # Check if container is running - improved check with debugging
+        local container_status=$(docker inspect -f '{{.State.Status}}' "$container_name" 2>/dev/null || echo "not_found")
+        if [ "$container_status" != "running" ]; then
+            log "${RED}❌ Tailscale container $container_name status: $container_status${NC}"
+            if [ "$container_status" != "not_found" ]; then
+                log "Container exists but is not running. Last 20 lines of logs:"
+                docker logs --tail 20 "$container_name" 2>&1 || true
+            fi
             return 1
         fi
         
