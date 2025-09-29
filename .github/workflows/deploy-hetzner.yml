@@ -37,7 +37,7 @@ env:
 jobs:
   wait-for-queue:
     name: Wait for Deployment Queue
-    if: github.event.inputs.action == 'deploy' || github.event_name == 'push'
+    if: github.event.inputs.action == 'deploy' || github.event_name == 'push' || github.event.inputs.action == 'cleanup' || github.event.inputs.action == 'cleanup-with-dashboard'
     runs-on: ubuntu-latest
     outputs:
       position: ${{ steps.check-queue.outputs.position }}
