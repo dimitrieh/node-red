@@ -127,6 +127,7 @@ jobs:
   validate-branch:
     name: Validate Branch Rebase
     needs: wait-for-queue
+    if: github.event.inputs.action != 'cleanup' && github.event.inputs.action != 'cleanup-with-dashboard'
     runs-on: ubuntu-latest
     outputs:
       branch_valid: ${{ steps.validate.outputs.valid }}
@@ -337,7 +338,7 @@ jobs:
 
   cleanup:
     name: Cleanup Hetzner Deployment
-    needs: [wait-for-queue, validate-branch]
+    needs: wait-for-queue
     if: github.event.inputs.action == 'cleanup' || github.event.inputs.action == 'cleanup-with-dashboard'
     runs-on: ubuntu-latest
     environment: nr-experiments
