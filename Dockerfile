@@ -49,7 +49,7 @@ RUN apk add --no-cache \
     && rm -rf /var/cache/apk/*
 
 # Create node-red user and directories
-RUN adduser -D -h /usr/src/node-red -s /bin/bash -u 1000 node-red \
+RUN adduser -D -h /usr/src/node-red -s /bin/bash node-red \
     && mkdir -p /data /tmp/node-red-sandbox /tmp/node-red-demo /tmp/empty-nodes-dir \
     && chown -R node-red:node-red /data /tmp/node-red-sandbox /tmp/node-red-demo /tmp/empty-nodes-dir
 
@@ -73,7 +73,7 @@ COPY --from=builder --chown=node-red:node-red /usr/src/node-red/package-lock.jso
 RUN npm install --omit=dev && npm cache clean --force
 
 # Copy default flows file for demo mode
-COPY --chown=node-red:node-red default-flows.json /tmp/default-flows.json
+COPY --chown=1000:1000 default-flows.json /tmp/default-flows.json
 
 # No demo-settings.js file created - configuration embedded in CMD for security
 
