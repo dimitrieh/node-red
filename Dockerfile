@@ -49,7 +49,7 @@ RUN apk add --no-cache \
     && rm -rf /var/cache/apk/*
 
 # Create node-red user and directories
-RUN adduser -D -h /usr/src/node-red -s /bin/bash node-red \
+RUN adduser -D -h /usr/src/node-red -s /bin/bash -u 1000 node-red \
     && mkdir -p /data /tmp/node-red-sandbox /tmp/node-red-demo /tmp/empty-nodes-dir \
     && chown -R node-red:node-red /data /tmp/node-red-sandbox /tmp/node-red-demo /tmp/empty-nodes-dir
 
