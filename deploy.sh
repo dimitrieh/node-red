@@ -1001,7 +1001,8 @@ generate_dashboard_html() {
         .filter-btn:last-child { border-right: none; }
         .filter-btn:hover { background: rgba(143, 0, 0, 0.05); color: #8f0000; }
         .filter-btn.active { background: #8f0000; color: white; }
-        .search-container { display: flex; align-items: center; background: white; border-radius: 8px; border: 2px solid #ddd; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: 40px; flex: 1; max-width: 400px; }
+        .search-container { display: flex; align-items: center; background: white; border-radius: 8px; border: 2px solid #ddd; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: 40px; flex: 1; max-width: 400px; transition: border-color 0.3s ease, box-shadow 0.3s ease; }
+        .search-container.active { border-color: #8f0000; box-shadow: 0 2px 8px rgba(143, 0, 0, 0.15); }
         .search-input { flex: 1; border: none; padding: 0 15px; font-size: 14px; outline: none; height: 100%; font-family: inherit; }
         .search-input::placeholder { color: #999; }
         .search-clear { background: transparent; border: none; color: #999; cursor: pointer; padding: 0 12px; font-size: 18px; line-height: 1; transition: color 0.2s ease; height: 100%; }
@@ -1423,15 +1424,19 @@ generate_dashboard_html() {
             document.getElementById('offline-count').textContent = stats.offline;
         }
 
-        // Update clear button visibility
+        // Update clear button visibility and search highlight
         function updateClearButton() {
             const clearBtn = document.getElementById('search-clear');
             const searchInput = document.getElementById('search-input');
-            if (clearBtn && searchInput) {
+            const searchContainer = searchInput?.parentElement;
+
+            if (clearBtn && searchInput && searchContainer) {
                 if (searchInput.value) {
                     clearBtn.classList.remove('hidden');
+                    searchContainer.classList.add('active');
                 } else {
                     clearBtn.classList.add('hidden');
+                    searchContainer.classList.remove('active');
                 }
             }
         }
