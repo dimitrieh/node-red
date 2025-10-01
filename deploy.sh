@@ -811,7 +811,14 @@ fetch_experiment_title() {
 
     # Export the URL
     export EXPERIMENT_URL="$experiment_url"
-    
+
+    # Export dashboard URL with search parameter
+    if [ -n "${TAILNET:-}" ]; then
+        local encoded_branch=$(printf %s "$branch" | jq -sRr @uri)
+        export DASHBOARD_URL="https://dashboard.${TAILNET}.ts.net?search=${encoded_branch}"
+        log "${BLUE}🔗 Dashboard URL: $DASHBOARD_URL${NC}"
+    fi
+
     return 0
 }
 
@@ -2079,13 +2086,13 @@ deploy_local() {
     # Run docker-compose
     if [ "$1" = "up" ] || [ "$1" = "" ]; then
         log "Running: docker compose -f $COMPOSE_FILE up -d"
-        env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" EXPERIMENT_URL="$EXPERIMENT_URL" docker compose -f "$COMPOSE_FILE" up -d
+        env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" EXPERIMENT_URL="$EXPERIMENT_URL" DASHBOARD_URL="$DASHBOARD_URL" docker compose -f "$COMPOSE_FILE" up -d
         
         # Validate Tailscale connection and retry if needed
         validate_and_retry_tailscale "nr-$BRANCH_NAME-tailscale" "nr_${BRANCH_NAME}_tailscale" "$COMPOSE_FILE" "tailscale"
     else
         log "Running: docker compose -f $COMPOSE_FILE $*"
-        env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" EXPERIMENT_URL="$EXPERIMENT_URL" docker compose -f "$COMPOSE_FILE" "$@"
+        env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" EXPERIMENT_URL="$EXPERIMENT_URL" DASHBOARD_URL="$DASHBOARD_URL" docker compose -f "$COMPOSE_FILE" "$@"
     fi
     
     if [ "$1" = "up" ] || [ "$1" = "" ]; then
@@ -2331,7 +2338,7 @@ deploy_remote_execution() {
         
         # Deploy with docker-compose
         log "${BLUE}Deploying with docker-compose...${NC}"
-        if env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" EXPERIMENT_URL="$EXPERIMENT_URL" docker compose -f docker-compose.yml up -d; then
+        if env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" EXPERIMENT_URL="$EXPERIMENT_URL" DASHBOARD_URL="$DASHBOARD_URL" docker compose -f docker-compose.yml up -d; then
             log "${GREEN}✅ Main deployment successful${NC}"
             
             # Validate Tailscale connection and retry if needed
@@ -2472,7 +2479,7 @@ deploy_remote_execution() {
         else
             # For other commands
             log "Running: docker compose $@"
-            env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" EXPERIMENT_URL="$EXPERIMENT_URL" docker compose -f docker-compose.yml "$@"
+            env TS_AUTHKEY="$TS_AUTHKEY" TALLY_SURVEY_ID="$TALLY_SURVEY_ID" TALLY_ISSUE_NUMBER="$TALLY_ISSUE_NUMBER" TALLY_BRANCH_NAME="$TALLY_BRANCH_NAME" TALLY_COMMIT="$TALLY_COMMIT" EXPERIMENT_TITLE="$EXPERIMENT_TITLE" EXPERIMENT_URL="$EXPERIMENT_URL" DASHBOARD_URL="$DASHBOARD_URL" docker compose -f docker-compose.yml "$@"
         fi
     fi
     
