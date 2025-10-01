@@ -1073,7 +1073,7 @@ generate_dashboard_html() {
         <div class="controls">
             <div class="meta-info" id="meta-info">Loading...</div>
             <div class="search-container">
-                <input type="text" class="search-input" id="search-input" placeholder="Search experiments...">
+                <input type="text" class="search-input" id="search-input" placeholder="Search experiments... (⌘F / Ctrl+F)">
                 <button class="search-clear hidden" id="search-clear" title="Clear search">&times;</button>
             </div>
             <div class="control-buttons">
