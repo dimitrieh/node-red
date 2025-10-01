@@ -1466,6 +1466,29 @@ generate_dashboard_html() {
                     displayContainers();
                 });
             }
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                // Cmd+F / Ctrl+F to focus search
+                if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+                    e.preventDefault();
+                    if (searchInput) {
+                        searchInput.focus();
+                        searchInput.select();
+                    }
+                }
+
+                // Esc to clear search (only if search input is focused)
+                if (e.key === 'Escape' && searchInput && document.activeElement === searchInput) {
+                    e.preventDefault();
+                    searchTerm = '';
+                    searchInput.value = '';
+                    updateUrlParameter('search', '');
+                    updateClearButton();
+                    displayContainers();
+                    searchInput.blur();
+                }
+            });
         });
 
         document.querySelectorAll('.filter-btn').forEach(btn => {
