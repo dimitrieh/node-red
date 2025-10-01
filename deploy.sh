@@ -789,24 +789,17 @@ fetch_experiment_title() {
         fi
     fi
     
-    # Set dashboard URL with search parameter for this experiment
-    if [ -n "${TAILNET:-}" ]; then
-        # URL-encode the branch name for the search parameter
-        local encoded_branch=$(printf %s "$branch" | jq -sRr @uri)
-        experiment_url="https://dashboard.${TAILNET}.ts.net?search=${encoded_branch}"
-        log "${BLUE}🔗 Using Dashboard URL with filter: $experiment_url${NC}"
+    # Determine URL priority: PR > Issue > Branch
+    if [ -n "$pr_url" ]; then
+        experiment_url="$pr_url"
+        log "${BLUE}🔗 Using PR URL: $experiment_url${NC}"
+    elif [ -n "$issue_url" ]; then
+        experiment_url="$issue_url"
+        log "${BLUE}🔗 Using Issue URL: $experiment_url${NC}"
     else
-        # Fallback to PR/Issue/Branch if TAILNET not set (shouldn't happen in production)
-        if [ -n "$pr_url" ]; then
-            experiment_url="$pr_url"
-            log "${YELLOW}⚠️  TAILNET not set, using PR URL: $experiment_url${NC}"
-        elif [ -n "$issue_url" ]; then
-            experiment_url="$issue_url"
-            log "${YELLOW}⚠️  TAILNET not set, using Issue URL: $experiment_url${NC}"
-        else
-            experiment_url="https://github.com/dimitrieh/node-red/tree/$branch"
-            log "${YELLOW}⚠️  TAILNET not set, using Branch URL: $experiment_url${NC}"
-        fi
+        # Default to branch URL
+        experiment_url="https://github.com/dimitrieh/node-red/tree/$branch"
+        log "${BLUE}🔗 Using Branch URL: $experiment_url${NC}"
     fi
 
     # Fallback to branch name if no title found
