@@ -789,26 +789,33 @@ fetch_experiment_title() {
         fi
     fi
     
-    # Determine URL priority: PR > Issue > Branch
-    if [ -n "$pr_url" ]; then
-        experiment_url="$pr_url"
-        log "${BLUE}🔗 Using PR URL: $experiment_url${NC}"
-    elif [ -n "$issue_url" ]; then
-        experiment_url="$issue_url"
-        log "${BLUE}🔗 Using Issue URL: $experiment_url${NC}"
+    # Set dashboard URL with search parameter for this experiment
+    if [ -n "${TAILNET:-}" ]; then
+        # URL-encode the branch name for the search parameter
+        local encoded_branch=$(printf %s "$branch" | jq -sRr @uri)
+        experiment_url="https://dashboard.${TAILNET}.ts.net?search=${encoded_branch}"
+        log "${BLUE}🔗 Using Dashboard URL with filter: $experiment_url${NC}"
     else
-        # Default to branch URL
-        experiment_url="https://github.com/dimitrieh/node-red/tree/$branch"
-        log "${BLUE}🔗 Using Branch URL: $experiment_url${NC}"
+        # Fallback to PR/Issue/Branch if TAILNET not set (shouldn't happen in production)
+        if [ -n "$pr_url" ]; then
+            experiment_url="$pr_url"
+            log "${YELLOW}⚠️  TAILNET not set, using PR URL: $experiment_url${NC}"
+        elif [ -n "$issue_url" ]; then
+            experiment_url="$issue_url"
+            log "${YELLOW}⚠️  TAILNET not set, using Issue URL: $experiment_url${NC}"
+        else
+            experiment_url="https://github.com/dimitrieh/node-red/tree/$branch"
+            log "${YELLOW}⚠️  TAILNET not set, using Branch URL: $experiment_url${NC}"
+        fi
     fi
-    
+
     # Fallback to branch name if no title found
     if [ -z "$experiment_title" ]; then
         experiment_title="$branch"
         log "${YELLOW}⚠️  No issue/PR title found, using branch name: $experiment_title${NC}"
         export EXPERIMENT_TITLE="$experiment_title"
     fi
-    
+
     # Export the URL
     export EXPERIMENT_URL="$experiment_url"
     
@@ -994,6 +1001,12 @@ generate_dashboard_html() {
         .filter-btn:last-child { border-right: none; }
         .filter-btn:hover { background: rgba(143, 0, 0, 0.05); color: #8f0000; }
         .filter-btn.active { background: #8f0000; color: white; }
+        .search-container { display: flex; align-items: center; background: white; border-radius: 8px; border: 2px solid #ddd; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); height: 40px; flex: 1; max-width: 400px; }
+        .search-input { flex: 1; border: none; padding: 0 15px; font-size: 14px; outline: none; height: 100%; font-family: inherit; }
+        .search-input::placeholder { color: #999; }
+        .search-clear { background: transparent; border: none; color: #999; cursor: pointer; padding: 0 12px; font-size: 18px; line-height: 1; transition: color 0.2s ease; height: 100%; }
+        .search-clear:hover { color: #8f0000; }
+        .search-clear.hidden { display: none; }
         .instances-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-top: 20px; }
         .instance-card { background: white; border-radius: 8px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; cursor: pointer; position: relative; overflow: hidden; border: 1px solid #e0e0e0; display: flex; flex-direction: column; }
         .instance-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15); border-color: #8f0000; }
@@ -1036,6 +1049,7 @@ generate_dashboard_html() {
             .controls { flex-direction: column; align-items: stretch; }
             .meta-info { width: 100%; text-align: center; }
             .control-buttons { justify-content: center; width: 100%; }
+            .search-container { max-width: 100%; }
         }
         @media (max-width: 600px) {
             .header h1 { font-size: 2rem; }
@@ -1056,6 +1070,10 @@ generate_dashboard_html() {
         </div>
         <div class="controls">
             <div class="meta-info" id="meta-info">Loading...</div>
+            <div class="search-container">
+                <input type="text" class="search-input" id="search-input" placeholder="Search experiments...">
+                <button class="search-clear hidden" id="search-clear" title="Clear search">&times;</button>
+            </div>
             <div class="control-buttons">
                 <button class="refresh-btn" onclick="checkAllStatus()">Check status</button>
                 <div class="status-filter">
@@ -1070,6 +1088,25 @@ generate_dashboard_html() {
     <script>
         let containersData = null;
         let currentFilter = 'all';
+        let searchTerm = '';
+
+        // Get URL parameter value
+        function getUrlParameter(name) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name) || '';
+        }
+
+        // Update URL parameter without page reload
+        function updateUrlParameter(name, value) {
+            const url = new URL(window.location);
+            if (value) {
+                url.searchParams.set(name, value);
+            } else {
+                url.searchParams.delete(name);
+            }
+            window.history.replaceState({}, '', url);
+        }
+
         function getRelativeTime(date) {
             const now = new Date();
             const diffMs = now - date;
@@ -1086,6 +1123,15 @@ generate_dashboard_html() {
             try {
                 const response = await fetch('containers.json');
                 containersData = await response.json();
+
+                // Initialize search from URL parameter
+                searchTerm = getUrlParameter('search');
+                const searchInput = document.getElementById('search-input');
+                if (searchInput) {
+                    searchInput.value = searchTerm;
+                    updateClearButton();
+                }
+
                 const metaInfo = document.getElementById('meta-info');
                 const generatedDate = new Date(containersData.generated);
                 const generated = generatedDate.toLocaleString();
@@ -1342,8 +1388,31 @@ generate_dashboard_html() {
         }
         function getFilteredContainers() {
             if (!containersData) return [];
-            if (currentFilter === 'all') { return containersData.containers; }
-            return containersData.containers.filter(container => { return container.urlStatus === currentFilter; });
+
+            let filtered = containersData.containers;
+
+            // Filter by status
+            if (currentFilter !== 'all') {
+                filtered = filtered.filter(container => container.urlStatus === currentFilter);
+            }
+
+            // Filter by search term
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                filtered = filtered.filter(container => {
+                    const name = (container.name || '').toLowerCase();
+                    const issueTitle = (container.issue_title || '').toLowerCase();
+                    const branch = (container.branch || '').toLowerCase();
+                    const image = (container.image || '').toLowerCase();
+
+                    return name.includes(term) ||
+                           issueTitle.includes(term) ||
+                           branch.includes(term) ||
+                           image.includes(term);
+                });
+            }
+
+            return filtered;
         }
         function updateStats() {
             if (!containersData) return;
@@ -1352,7 +1421,47 @@ generate_dashboard_html() {
             document.getElementById('online-count').textContent = stats.online;
             document.getElementById('offline-count').textContent = stats.offline;
         }
-        document.addEventListener('DOMContentLoaded', loadContainersData);
+
+        // Update clear button visibility
+        function updateClearButton() {
+            const clearBtn = document.getElementById('search-clear');
+            const searchInput = document.getElementById('search-input');
+            if (clearBtn && searchInput) {
+                if (searchInput.value) {
+                    clearBtn.classList.remove('hidden');
+                } else {
+                    clearBtn.classList.add('hidden');
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadContainersData();
+
+            // Search input handler
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    searchTerm = e.target.value;
+                    updateUrlParameter('search', searchTerm);
+                    updateClearButton();
+                    displayContainers();
+                });
+            }
+
+            // Clear button handler
+            const clearBtn = document.getElementById('search-clear');
+            if (clearBtn) {
+                clearBtn.addEventListener('click', () => {
+                    searchTerm = '';
+                    if (searchInput) searchInput.value = '';
+                    updateUrlParameter('search', '');
+                    updateClearButton();
+                    displayContainers();
+                });
+            }
+        });
+
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 document.querySelector('.filter-btn.active').classList.remove('active');
