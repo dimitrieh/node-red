@@ -1049,7 +1049,7 @@ generate_dashboard_html() {
             .controls { flex-direction: column; align-items: stretch; }
             .meta-info { width: 100%; text-align: center; }
             .control-buttons { justify-content: center; width: 100%; }
-            .search-container { max-width: 100%; height: auto; min-height: 48px; padding: 4px 0; }
+            .search-container { max-width: 100%; height: auto; min-height: 42px; padding: 4px 0; }
             .search-input { padding: 0 15px; }
         }
         @media (max-width: 600px) {
