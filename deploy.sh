@@ -1479,8 +1479,8 @@ generate_dashboard_html() {
                     }
                 }
 
-                // Esc to clear search (only if search input is focused)
-                if (e.key === 'Escape' && searchInput && document.activeElement === searchInput) {
+                // Esc to clear search (works from anywhere if search is active)
+                if (e.key === 'Escape' && searchInput && searchTerm) {
                     e.preventDefault();
                     searchTerm = '';
                     searchInput.value = '';
