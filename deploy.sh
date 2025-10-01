@@ -1045,11 +1045,12 @@ generate_dashboard_html() {
         .experiment-name { font-weight: 600; font-size: 1.1rem; margin-bottom: 8px; color: #333; }
         .experiment-sub-link { display: inline-block; margin-top: 10px; padding: 8px 16px; background: white; color: #8f0000; text-decoration: none; border-radius: 4px; font-size: 0.9rem; cursor: pointer; transition: all 0.3s ease; border: 2px solid #8f0000; }
         .experiment-sub-link:hover { background: #8f0000; color: white; }
-        @media (max-width: 900px) {
+        @media (max-width: 1200px) {
             .controls { flex-direction: column; align-items: stretch; }
             .meta-info { width: 100%; text-align: center; }
             .control-buttons { justify-content: center; width: 100%; }
-            .search-container { max-width: 100%; }
+            .search-container { max-width: 100%; height: auto; min-height: 48px; padding: 4px 0; }
+            .search-input { padding: 0 15px; }
         }
         @media (max-width: 600px) {
             .header h1 { font-size: 2rem; }
