@@ -144,6 +144,9 @@ jobs:
       - name: Fetch all branches
         run: |
           git fetch --all --prune
+          # Add upstream remote for node-red-dev validation against origin/dev
+          git remote add upstream https://github.com/node-red/node-red.git || true
+          git fetch upstream
           echo "Available branches:"
           git branch -a
 
@@ -152,13 +155,14 @@ jobs:
         shell: bash
         env:
           BRANCH_NAME: ${{ github.event.inputs.branch || github.ref_name }}
-          # node-red-dev is based on origin/dev, other branches on experiment-template
+          # node-red-dev is based on upstream/dev, other branches on origin/experiment-template
           BASE_BRANCH: ${{ (github.event.inputs.branch || github.ref_name) == 'node-red-dev' && 'dev' || 'experiment-template' }}
+          BASE_REMOTE: ${{ (github.event.inputs.branch || github.ref_name) == 'node-red-dev' && 'upstream' || 'origin' }}
         run: |
           set -euo pipefail
 
           echo "::group::🔍 Validating branch: $BRANCH_NAME"
-          echo "📋 Base branch: $BASE_BRANCH"
+          echo "📋 Base branch: $BASE_REMOTE/$BASE_BRANCH"
 
           # Check if target branch exists
           if ! git show-ref --verify --quiet "refs/remotes/origin/$BRANCH_NAME"; then
@@ -171,32 +175,32 @@ jobs:
           fi
 
           # Check if base branch exists
-          if ! git show-ref --verify --quiet "refs/remotes/origin/$BASE_BRANCH"; then
-            echo "::error::Base branch '$BASE_BRANCH' does not exist on remote"
+          if ! git show-ref --verify --quiet "refs/remotes/$BASE_REMOTE/$BASE_BRANCH"; then
+            echo "::error::Base branch '$BASE_BRANCH' does not exist on $BASE_REMOTE"
             echo "valid=false" >> "$GITHUB_OUTPUT"
             echo "needs_rebase=false" >> "$GITHUB_OUTPUT"
-            echo "message=Base branch '$BASE_BRANCH' does not exist on remote" >> "$GITHUB_OUTPUT"
+            echo "message=Base branch '$BASE_BRANCH' does not exist on $BASE_REMOTE" >> "$GITHUB_OUTPUT"
             echo "::endgroup::"
             exit 0
           fi
 
           # Get latest commits
-          git checkout "origin/$BASE_BRANCH"
+          git checkout "$BASE_REMOTE/$BASE_BRANCH"
           BASE_COMMIT=$(git rev-parse HEAD)
 
           git checkout "origin/$BRANCH_NAME"
           BRANCH_COMMIT=$(git rev-parse HEAD)
 
-          echo "📍 Base branch ($BASE_BRANCH) latest commit: $BASE_COMMIT"
+          echo "📍 Base branch ($BASE_REMOTE/$BASE_BRANCH) latest commit: $BASE_COMMIT"
           echo "📍 Target branch ($BRANCH_NAME) latest commit: $BRANCH_COMMIT"
 
           # Check if base branch is ancestor of target branch
           if ! git merge-base --is-ancestor "$BASE_COMMIT" "$BRANCH_COMMIT"; then
-            echo "::warning::Branch '$BRANCH_NAME' is not rebased on latest '$BASE_BRANCH'"
+            echo "::warning::Branch '$BRANCH_NAME' is not rebased on latest '$BASE_REMOTE/$BASE_BRANCH'"
             echo "::notice::Branch needs automatic rebase"
             echo "valid=false" >> "$GITHUB_OUTPUT"
             echo "needs_rebase=true" >> "$GITHUB_OUTPUT"
-            echo "message=Branch '$BRANCH_NAME' needs rebase on latest '$BASE_BRANCH'. Attempting automatic rebase..." >> "$GITHUB_OUTPUT"
+            echo "message=Branch '$BRANCH_NAME' needs rebase on latest '$BASE_REMOTE/$BASE_BRANCH'. Attempting automatic rebase..." >> "$GITHUB_OUTPUT"
             echo "::endgroup::"
             exit 0
           fi
@@ -210,17 +214,17 @@ jobs:
           fi
 
           # Get the merge base to check how recent the rebase is
-          MERGE_BASE=$(git merge-base "origin/$BASE_BRANCH" "origin/$BRANCH_NAME")
-          COMMITS_BEHIND=$(git rev-list --count "$MERGE_BASE..origin/$BASE_BRANCH" || echo "0")
+          MERGE_BASE=$(git merge-base "$BASE_REMOTE/$BASE_BRANCH" "origin/$BRANCH_NAME")
+          COMMITS_BEHIND=$(git rev-list --count "$MERGE_BASE..$BASE_REMOTE/$BASE_BRANCH" || echo "0")
 
           if [ "$COMMITS_BEHIND" -gt 0 ]; then
-            echo "::warning::Branch '$BRANCH_NAME' is $COMMITS_BEHIND commit(s) behind latest '$BASE_BRANCH'"
-            echo "💡 Consider rebasing to include latest changes: git rebase origin/$BASE_BRANCH"
+            echo "::warning::Branch '$BRANCH_NAME' is $COMMITS_BEHIND commit(s) behind latest '$BASE_REMOTE/$BASE_BRANCH'"
+            echo "💡 Consider rebasing to include latest changes: git rebase $BASE_REMOTE/$BASE_BRANCH"
             # Note: This is a warning, not a failure for now
           fi
 
           # All validations passed
-          echo "✅ Branch '$BRANCH_NAME' is properly rebased on '$BASE_BRANCH'"
+          echo "✅ Branch '$BRANCH_NAME' is properly rebased on '$BASE_REMOTE/$BASE_BRANCH'"
           echo "📊 Commits behind base: $COMMITS_BEHIND"
           echo "🎯 Ready for deployment"
           echo "::endgroup::"
@@ -458,24 +462,28 @@ jobs:
       - name: Perform automatic rebase and trigger deployment
         env:
           BRANCH_NAME: ${{ github.event.inputs.branch || github.ref_name }}
-          # node-red-dev is based on origin/dev, other branches on experiment-template
+          # node-red-dev is based on upstream/dev, other branches on origin/experiment-template
           BASE_BRANCH: ${{ (github.event.inputs.branch || github.ref_name) == 'node-red-dev' && 'dev' || 'experiment-template' }}
+          BASE_REMOTE: ${{ (github.event.inputs.branch || github.ref_name) == 'node-red-dev' && 'upstream' || 'origin' }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
           echo "::group::🔄 Performing automatic rebase"
           echo "📋 Branch: $BRANCH_NAME"
-          echo "📍 Base: $BASE_BRANCH"
+          echo "📍 Base: $BASE_REMOTE/$BASE_BRANCH"
 
           # Fetch latest changes
           git fetch --all --prune
+          # Add upstream remote for node-red-dev
+          git remote add upstream https://github.com/node-red/node-red.git || true
+          git fetch upstream
 
           # Checkout the branch
           git checkout "$BRANCH_NAME"
 
           # Attempt rebase
-          if git rebase "origin/$BASE_BRANCH"; then
+          if git rebase "$BASE_REMOTE/$BASE_BRANCH"; then
             echo "✅ Rebase successful - no conflicts"
             
             # Push the rebased branch using the default GITHUB_TOKEN
@@ -511,9 +519,9 @@ jobs:
             echo "::error::❌ Rebase failed due to conflicts"
             echo "::notice::Manual intervention required. Run these commands locally:"
             echo ""
-            echo "git fetch origin"
+            echo "git fetch --all"
             echo "git checkout $BRANCH_NAME"
-            echo "git rebase origin/$BASE_BRANCH"
+            echo "git rebase $BASE_REMOTE/$BASE_BRANCH"
             echo "# Resolve conflicts, then:"
             echo "git rebase --continue"
             echo "git push --force-with-lease origin $BRANCH_NAME"
