@@ -7,6 +7,7 @@ on:
       - "claude/*"
       - "experiment-*"
       - "experiment-template"
+      - "node-red-dev"
   workflow_dispatch:
     inputs:
       branch:
@@ -146,12 +147,13 @@ jobs:
           echo "Available branches:"
           git branch -a
 
-      - name: Validate branch rebase on experiment-template
+      - name: Validate branch rebase on base branch
         id: validate
         shell: bash
         env:
           BRANCH_NAME: ${{ github.event.inputs.branch || github.ref_name }}
-          BASE_BRANCH: experiment-template
+          # node-red-dev is based on origin/dev, other branches on experiment-template
+          BASE_BRANCH: ${{ (github.event.inputs.branch || github.ref_name) == 'node-red-dev' && 'dev' || 'experiment-template' }}
         run: |
           set -euo pipefail
 
@@ -456,7 +458,8 @@ jobs:
       - name: Perform automatic rebase and trigger deployment
         env:
           BRANCH_NAME: ${{ github.event.inputs.branch || github.ref_name }}
-          BASE_BRANCH: experiment-template
+          # node-red-dev is based on origin/dev, other branches on experiment-template
+          BASE_BRANCH: ${{ (github.event.inputs.branch || github.ref_name) == 'node-red-dev' && 'dev' || 'experiment-template' }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
