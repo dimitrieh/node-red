@@ -4,7 +4,7 @@
 #==============================================================================
 # BUILD STAGE: Build Node-RED from source
 #==============================================================================
-FROM node:18-alpine AS builder
+FROM node:24-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -38,7 +38,7 @@ RUN test -d packages/node_modules/@node-red/editor-client/public || (echo "Build
 #==============================================================================
 # RUNTIME STAGE: Clean minimal runtime environment
 #==============================================================================
-FROM node:18-alpine AS runtime
+FROM node:24-alpine AS runtime
 
 # Install minimal runtime dependencies
 RUN apk add --no-cache \
@@ -84,7 +84,7 @@ RUN chown -R node-red:node-red /usr/src/node-red
 USER node-red
 
 # Environment variables
-ENV NODE_RED_VERSION=4.1.0 \
+ENV NODE_RED_VERSION=5.0.0-beta.0 \
     NODE_PATH=/usr/src/node-red/packages/node_modules \
     PATH=/usr/src/node-red/packages/node_modules/.bin:${PATH} \
     NODE_ENV=production \
