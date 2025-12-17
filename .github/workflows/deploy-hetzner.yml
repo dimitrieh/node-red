@@ -8,6 +8,7 @@ on:
       - "experiment-*"
       - "experiment-template"
       - "node-red-dev"
+      - "node-red-dev-*"
   workflow_dispatch:
     inputs:
       branch:
@@ -155,14 +156,33 @@ jobs:
         shell: bash
         env:
           BRANCH_NAME: ${{ github.event.inputs.branch || github.ref_name }}
-          # node-red-dev is based on upstream/dev, other branches on origin/experiment-template
-          BASE_BRANCH: ${{ (github.event.inputs.branch || github.ref_name) == 'node-red-dev' && 'dev' || 'experiment-template' }}
-          BASE_REMOTE: ${{ (github.event.inputs.branch || github.ref_name) == 'node-red-dev' && 'upstream' || 'origin' }}
         run: |
           set -euo pipefail
 
           echo "::group::🔍 Validating branch: $BRANCH_NAME"
-          echo "📋 Base branch: $BASE_REMOTE/$BASE_BRANCH"
+
+          # Determine base branch and remote based on branch name pattern:
+          # - node-red-dev (exact) -> upstream/dev
+          # - node-red-dev-* (e.g., node-red-dev-5.0.0-beta.1) -> upstream tag (extracted from branch name)
+          # - other branches -> origin/experiment-template
+          if [[ "$BRANCH_NAME" == "node-red-dev" ]]; then
+            BASE_REMOTE="upstream"
+            BASE_BRANCH="dev"
+            BASE_REF="$BASE_REMOTE/$BASE_BRANCH"
+            echo "📋 Base: $BASE_REF (tracking upstream dev)"
+          elif [[ "$BRANCH_NAME" =~ ^node-red-dev-(.+)$ ]]; then
+            # Extract version from branch name (e.g., node-red-dev-5.0.0-beta.1 -> 5.0.0-beta.1)
+            TAG_VERSION="${BASH_REMATCH[1]}"
+            BASE_REMOTE="upstream"
+            BASE_REF="$TAG_VERSION"
+            BASE_BRANCH="$TAG_VERSION"
+            echo "📋 Base: tag $TAG_VERSION (pinned to upstream release)"
+          else
+            BASE_REMOTE="origin"
+            BASE_BRANCH="experiment-template"
+            BASE_REF="$BASE_REMOTE/$BASE_BRANCH"
+            echo "📋 Base: $BASE_REF"
+          fi
 
           # Check if target branch exists
           if ! git show-ref --verify --quiet "refs/remotes/origin/$BRANCH_NAME"; then
@@ -174,57 +194,86 @@ jobs:
             exit 0
           fi
 
-          # Check if base branch exists
-          if ! git show-ref --verify --quiet "refs/remotes/$BASE_REMOTE/$BASE_BRANCH"; then
-            echo "::error::Base branch '$BASE_BRANCH' does not exist on $BASE_REMOTE"
-            echo "valid=false" >> "$GITHUB_OUTPUT"
-            echo "needs_rebase=false" >> "$GITHUB_OUTPUT"
-            echo "message=Base branch '$BASE_BRANCH' does not exist on $BASE_REMOTE" >> "$GITHUB_OUTPUT"
-            echo "::endgroup::"
-            exit 0
+          # Check if base ref exists (branch or tag)
+          if [[ "$BRANCH_NAME" =~ ^node-red-dev-(.+)$ ]]; then
+            # For node-red-dev-* branches, check if tag exists
+            if ! git rev-parse --verify "refs/tags/$TAG_VERSION" >/dev/null 2>&1; then
+              echo "::error::Tag '$TAG_VERSION' does not exist on upstream"
+              echo "valid=false" >> "$GITHUB_OUTPUT"
+              echo "needs_rebase=false" >> "$GITHUB_OUTPUT"
+              echo "message=Tag '$TAG_VERSION' does not exist. Ensure the tag exists on upstream." >> "$GITHUB_OUTPUT"
+              echo "::endgroup::"
+              exit 0
+            fi
+            BASE_COMMIT=$(git rev-parse "refs/tags/$TAG_VERSION")
+          else
+            # For other branches, check if base branch exists
+            if ! git show-ref --verify --quiet "refs/remotes/$BASE_REMOTE/$BASE_BRANCH"; then
+              echo "::error::Base branch '$BASE_BRANCH' does not exist on $BASE_REMOTE"
+              echo "valid=false" >> "$GITHUB_OUTPUT"
+              echo "needs_rebase=false" >> "$GITHUB_OUTPUT"
+              echo "message=Base branch '$BASE_BRANCH' does not exist on $BASE_REMOTE" >> "$GITHUB_OUTPUT"
+              echo "::endgroup::"
+              exit 0
+            fi
+            git checkout "$BASE_REMOTE/$BASE_BRANCH"
+            BASE_COMMIT=$(git rev-parse HEAD)
           fi
-
-          # Get latest commits
-          git checkout "$BASE_REMOTE/$BASE_BRANCH"
-          BASE_COMMIT=$(git rev-parse HEAD)
 
           git checkout "origin/$BRANCH_NAME"
           BRANCH_COMMIT=$(git rev-parse HEAD)
 
-          echo "📍 Base branch ($BASE_REMOTE/$BASE_BRANCH) latest commit: $BASE_COMMIT"
-          echo "📍 Target branch ($BRANCH_NAME) latest commit: $BRANCH_COMMIT"
+          echo "📍 Base ($BASE_REF) commit: $BASE_COMMIT"
+          echo "📍 Target branch ($BRANCH_NAME) commit: $BRANCH_COMMIT"
 
-          # Check if base branch is ancestor of target branch
+          # Check if base is ancestor of target branch
           if ! git merge-base --is-ancestor "$BASE_COMMIT" "$BRANCH_COMMIT"; then
-            echo "::warning::Branch '$BRANCH_NAME' is not rebased on latest '$BASE_REMOTE/$BASE_BRANCH'"
-            echo "::notice::Branch needs automatic rebase"
-            echo "valid=false" >> "$GITHUB_OUTPUT"
-            echo "needs_rebase=true" >> "$GITHUB_OUTPUT"
-            echo "message=Branch '$BRANCH_NAME' needs rebase on latest '$BASE_REMOTE/$BASE_BRANCH'. Attempting automatic rebase..." >> "$GITHUB_OUTPUT"
-            echo "::endgroup::"
-            exit 0
+            if [[ "$BRANCH_NAME" =~ ^node-red-dev-(.+)$ ]]; then
+              # For node-red-dev-* branches, fail immediately (no auto-rebase)
+              echo "::error::Branch '$BRANCH_NAME' is not based on tag '$BASE_REF'"
+              echo "::notice::This branch must be manually rebased onto the upstream tag"
+              echo "valid=false" >> "$GITHUB_OUTPUT"
+              echo "needs_rebase=false" >> "$GITHUB_OUTPUT"
+              echo "message=Branch '$BRANCH_NAME' is not based on tag '$BASE_REF'. Manual rebase required." >> "$GITHUB_OUTPUT"
+              echo "::endgroup::"
+              exit 1
+            else
+              # For other branches, allow auto-rebase
+              echo "::warning::Branch '$BRANCH_NAME' is not rebased on '$BASE_REF'"
+              echo "::notice::Branch needs automatic rebase"
+              echo "valid=false" >> "$GITHUB_OUTPUT"
+              echo "needs_rebase=true" >> "$GITHUB_OUTPUT"
+              echo "message=Branch '$BRANCH_NAME' needs rebase on '$BASE_REF'. Attempting automatic rebase..." >> "$GITHUB_OUTPUT"
+              echo "::endgroup::"
+              exit 0
+            fi
           fi
 
           # Check for merge commits from base branch (indicates merge instead of rebase)
-          MERGE_COMMITS=$(git log --oneline --merges "$BASE_COMMIT..$BRANCH_COMMIT" --grep="Merge.*$BASE_BRANCH" | wc -l || echo "0")
-          if [ "$MERGE_COMMITS" -gt 0 ]; then
-            echo "::warning::Found $MERGE_COMMITS merge commit(s) from '$BASE_BRANCH'"
-            echo "💡 Consider using rebase instead of merge for cleaner history"
-            # Note: This is a warning, not a failure
-          fi
+          # Skip this check for tag-based validation
+          if [[ ! "$BRANCH_NAME" =~ ^node-red-dev-(.+)$ ]]; then
+            MERGE_COMMITS=$(git log --oneline --merges "$BASE_COMMIT..$BRANCH_COMMIT" --grep="Merge.*$BASE_BRANCH" | wc -l || echo "0")
+            if [ "$MERGE_COMMITS" -gt 0 ]; then
+              echo "::warning::Found $MERGE_COMMITS merge commit(s) from '$BASE_BRANCH'"
+              echo "💡 Consider using rebase instead of merge for cleaner history"
+              # Note: This is a warning, not a failure
+            fi
 
-          # Get the merge base to check how recent the rebase is
-          MERGE_BASE=$(git merge-base "$BASE_REMOTE/$BASE_BRANCH" "origin/$BRANCH_NAME")
-          COMMITS_BEHIND=$(git rev-list --count "$MERGE_BASE..$BASE_REMOTE/$BASE_BRANCH" || echo "0")
+            # Get the merge base to check how recent the rebase is
+            MERGE_BASE=$(git merge-base "$BASE_REMOTE/$BASE_BRANCH" "origin/$BRANCH_NAME")
+            COMMITS_BEHIND=$(git rev-list --count "$MERGE_BASE..$BASE_REMOTE/$BASE_BRANCH" || echo "0")
 
-          if [ "$COMMITS_BEHIND" -gt 0 ]; then
-            echo "::warning::Branch '$BRANCH_NAME' is $COMMITS_BEHIND commit(s) behind latest '$BASE_REMOTE/$BASE_BRANCH'"
-            echo "💡 Consider rebasing to include latest changes: git rebase $BASE_REMOTE/$BASE_BRANCH"
-            # Note: This is a warning, not a failure for now
+            if [ "$COMMITS_BEHIND" -gt 0 ]; then
+              echo "::warning::Branch '$BRANCH_NAME' is $COMMITS_BEHIND commit(s) behind latest '$BASE_REMOTE/$BASE_BRANCH'"
+              echo "💡 Consider rebasing to include latest changes: git rebase $BASE_REMOTE/$BASE_BRANCH"
+              # Note: This is a warning, not a failure for now
+            fi
+          else
+            COMMITS_BEHIND=0
           fi
 
           # All validations passed
-          echo "✅ Branch '$BRANCH_NAME' is properly rebased on '$BASE_REMOTE/$BASE_BRANCH'"
+          echo "✅ Branch '$BRANCH_NAME' is properly based on '$BASE_REF'"
           echo "📊 Commits behind base: $COMMITS_BEHIND"
           echo "🎯 Ready for deployment"
           echo "::endgroup::"
@@ -462,28 +511,40 @@ jobs:
       - name: Perform automatic rebase and trigger deployment
         env:
           BRANCH_NAME: ${{ github.event.inputs.branch || github.ref_name }}
-          # node-red-dev is based on upstream/dev, other branches on origin/experiment-template
-          BASE_BRANCH: ${{ (github.event.inputs.branch || github.ref_name) == 'node-red-dev' && 'dev' || 'experiment-template' }}
-          BASE_REMOTE: ${{ (github.event.inputs.branch || github.ref_name) == 'node-red-dev' && 'upstream' || 'origin' }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
           echo "::group::🔄 Performing automatic rebase"
           echo "📋 Branch: $BRANCH_NAME"
-          echo "📍 Base: $BASE_REMOTE/$BASE_BRANCH"
 
           # Fetch latest changes
           git fetch --all --prune
-          # Add upstream remote for node-red-dev
+          # Add upstream remote for node-red-dev* branches
           git remote add upstream https://github.com/node-red/node-red.git || true
-          git fetch upstream
+          git fetch upstream --tags
+
+          # Determine base ref based on branch name pattern:
+          # - node-red-dev (exact) -> upstream/dev
+          # - node-red-dev-* (e.g., node-red-dev-5.0.0-beta.1) -> upstream tag
+          # - other branches -> origin/experiment-template
+          if [[ "$BRANCH_NAME" == "node-red-dev" ]]; then
+            BASE_REF="upstream/dev"
+            echo "📍 Base: $BASE_REF (tracking upstream dev)"
+          elif [[ "$BRANCH_NAME" =~ ^node-red-dev-(.+)$ ]]; then
+            TAG_VERSION="${BASH_REMATCH[1]}"
+            BASE_REF="$TAG_VERSION"
+            echo "📍 Base: tag $TAG_VERSION (pinned to upstream release)"
+          else
+            BASE_REF="origin/experiment-template"
+            echo "📍 Base: $BASE_REF"
+          fi
 
           # Checkout the branch
           git checkout "$BRANCH_NAME"
 
           # Attempt rebase
-          if git rebase "$BASE_REMOTE/$BASE_BRANCH"; then
+          if git rebase "$BASE_REF"; then
             echo "✅ Rebase successful - no conflicts"
             
             # Push the rebased branch using the default GITHUB_TOKEN
@@ -521,7 +582,7 @@ jobs:
             echo ""
             echo "git fetch --all"
             echo "git checkout $BRANCH_NAME"
-            echo "git rebase $BASE_REMOTE/$BASE_BRANCH"
+            echo "git rebase $BASE_REF"
             echo "# Resolve conflicts, then:"
             echo "git rebase --continue"
             echo "git push --force-with-lease origin $BRANCH_NAME"
