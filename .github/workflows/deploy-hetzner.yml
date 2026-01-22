@@ -7,6 +7,8 @@ on:
       - "claude/*"
       - "experiment-*"
       - "experiment-template"
+      - "node-red-dev"
+      - "node-red-dev-*"
   workflow_dispatch:
     inputs:
       branch:
