@@ -15,7 +15,12 @@ module.exports = defineConfig({
     projects: [
         {
             name: 'chromium',
-            use: { browserName: 'chromium' }
+            use: {
+                browserName: 'chromium',
+                launchOptions: {
+                    args: ['--no-sandbox', '--disable-setuid-sandbox']
+                }
+            }
         }
     ]
 });
