@@ -26,6 +26,7 @@
         }
     ],
     "dependencies": {
+        "@automerge/automerge": "^3.2.3",
         "acorn": "8.15.0",
         "acorn-walk": "8.3.4",
         "ajv": "8.17.1",
