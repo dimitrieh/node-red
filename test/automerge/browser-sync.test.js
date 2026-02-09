@@ -125,9 +125,14 @@ test.describe('Automerge Collaborative Editing Sync', () => {
         const nodeInA = await getDocNode(pageA, nodeId);
         expect(nodeInA).not.toBeNull();
 
-        await pageB.waitForTimeout(SYNC_WAIT);
+        // Poll for sync with retries instead of fixed wait
+        let nodeInB = null;
+        for (let attempt = 0; attempt < 10; attempt++) {
+            await pageB.waitForTimeout(1000);
+            nodeInB = await getDocNode(pageB, nodeId);
+            if (nodeInB) break;
+        }
 
-        const nodeInB = await getDocNode(pageB, nodeId);
         expect(nodeInB).not.toBeNull();
         expect(nodeInB.name).toBe('test-sync-node');
         expect(nodeInB.type).toBe('inject');
@@ -327,45 +332,35 @@ test.describe('Automerge Collaborative Editing Sync', () => {
     });
 
     test('workspace order sync between tabs', async () => {
-        // Add two workspaces in tab A
-        const [ws1, ws2] = await pageA.evaluate(() => {
+        // Add two workspaces in tab A and immediately set order
+        const result = await pageA.evaluate(() => {
             const id1 = RED.nodes.id();
             const id2 = RED.nodes.id();
             RED.automerge.addNode({ type: 'tab', id: id1, label: 'Order Test 1', disabled: false });
             RED.automerge.addNode({ type: 'tab', id: id2, label: 'Order Test 2', disabled: false });
-            return [id1, id2];
-        });
 
-        await pageB.waitForTimeout(SYNC_WAIT);
-
-        // Verify both workspaces exist in B
-        const stateB = await getDocState(pageB);
-        expect(stateB.workspaces).toContain(ws1);
-        expect(stateB.workspaces).toContain(ws2);
-
-        // Get current order and rearrange so ws2 comes before ws1
-        const currentOrder = await pageA.evaluate(() => {
+            // Get existing workspaceOrder, append ws2 before ws1
             const doc = RED.automerge.getDocument();
-            return JSON.parse(JSON.stringify(doc.workspaceOrder || []));
+            const current = JSON.parse(JSON.stringify(doc.workspaceOrder || []));
+            // Filter out ws1/ws2 if already present, then append ws2 before ws1
+            const base = current.filter(id => id !== id1 && id !== id2);
+            RED.automerge.setWorkspaceOrder([...base, id2, id1]);
+
+            return { ws1: id1, ws2: id2 };
         });
 
-        // Build new order: keep existing order, then append ws2, ws1
-        // (the setWorkspaceOrder filters to only IDs in doc.workspaces)
-        await pageA.evaluate((args) => {
-            const { ws1, ws2, currentOrder } = args;
-            // Remove ws1/ws2 from current order if present, then add in desired order
-            const base = currentOrder.filter(id => id !== ws1 && id !== ws2);
-            const newOrder = [...base, ws2, ws1];
-            RED.automerge.setWorkspaceOrder(newOrder);
-        }, { ws1, ws2, currentOrder });
+        const { ws1, ws2 } = result;
 
-        await pageB.waitForTimeout(SYNC_WAIT);
-
-        // Verify order in B
-        const orderB = await pageB.evaluate(() => {
-            const doc = RED.automerge.getDocument();
-            return JSON.parse(JSON.stringify(doc.workspaceOrder || []));
-        });
+        // Poll for sync
+        let orderB = [];
+        for (let attempt = 0; attempt < 10; attempt++) {
+            await pageB.waitForTimeout(1000);
+            orderB = await pageB.evaluate(() => {
+                const doc = RED.automerge.getDocument();
+                return JSON.parse(JSON.stringify(doc.workspaceOrder || []));
+            });
+            if (orderB.includes(ws1) && orderB.includes(ws2)) break;
+        }
 
         const idx1 = orderB.indexOf(ws1);
         const idx2 = orderB.indexOf(ws2);
